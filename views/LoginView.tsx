@@ -44,15 +44,19 @@ const styles = {
         width: '100%',
         padding: '12px',
     },
-    forgotPasswordLink: {
-        display: 'block',
-        textAlign: 'right',
-        fontSize: '12px',
-        marginTop: '-12px',
-        marginBottom: '20px',
+    forgotPasswordButton: {
+        background: 'none',
+        border: 'none',
         color: 'var(--primary-color)',
+        cursor: 'pointer',
+        display: 'block',
+        fontSize: '12px',
+        marginBottom: '20px',
+        marginTop: '-12px',
+        padding: 0,
+        textAlign: 'right',
         textDecoration: 'none',
-        cursor: 'pointer'
+        width: '100%',
     },
 } as const;
 
@@ -193,9 +197,9 @@ const LoginView = () => {
                                 />
                             </div>
                         </div>
-                         <a onClick={() => setIsResetModalOpen(true)} style={styles.forgotPasswordLink}>
+                         <button type="button" onClick={() => setIsResetModalOpen(true)} style={styles.forgotPasswordButton}>
                             ¿Olvidó su contraseña?
-                        </a>
+                        </button>
                         <button type="submit" className={`btn btn-primary ${isLoading ? 'loading' : ''}`} style={styles.button} disabled={isLoading}>
                             {isLoading && <div className="spinner"></div>}
                             <span className="btn-text">Ingresar</span>
