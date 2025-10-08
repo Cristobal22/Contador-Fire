@@ -38,6 +38,9 @@ interface Session {
     updateUser: (user: User) => Promise<void>;
     deleteUser: (userId: string) => Promise<void>;
     handleApiError: (error: any, context: string) => void;
+    addCompany: (company: Omit<Company, 'id' | 'owner_id'>) => Promise<void>;
+    updateCompany: (company: Company) => Promise<void>;
+    deleteCompany: (id: number) => Promise<void>;
 }
 
 const SessionContext = createContext<Session | undefined>(undefined);
@@ -376,6 +379,44 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (error) throw error;
     };
 
+    const addCompany = async (company: Omit<Company, 'id' | 'owner_id'>) => {
+        if (!currentUser) {
+            handleApiError({ message: 'Usuario no autenticado' }, 'al agregar empresa');
+            return;
+        }
+        try {
+            const newCompany = { ...company, owner_id: currentUser.id };
+            const { error } = await supabase.from('companies').insert(newCompany);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empresa agregada correctamente.' });
+            await refreshTable('companies');
+        } catch (error: any) {
+            handleApiError(error, 'al agregar la empresa');
+        }
+    };
+
+    const updateCompany = async (company: Company) => {
+        try {
+            const { error } = await supabase.from('companies').update(company).eq('id', company.id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empresa actualizada correctamente.' });
+            await refreshTable('companies');
+        } catch (error: any) {
+            handleApiError(error, 'al actualizar la empresa');
+        }
+    };
+
+    const deleteCompany = async (id: number) => {
+        try {
+            const { error } = await supabase.from('companies').delete().eq('id', id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empresa eliminada correctamente.' });
+            await refreshTable('companies');
+        } catch (error: any) {
+            handleApiError(error, 'al eliminar la empresa');
+        }
+    };
+
     return (
         <SessionContext.Provider value={{
             currentUser, companies, chartOfAccounts, subjects, costCenters, items, employees,
@@ -383,7 +424,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             payslips, bankReconciliations, users, accountGroups, familyAllowances, activeCompany, activeCompanyId: activeCompany?.id || null,
             activePeriod, periods, isLoading, notifications, login, logout, addNotification,
             switchCompany, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
-            addUser, updateUser, deleteUser, handleApiError
+            addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany
         }}>
             {children}
         </SessionContext.Provider>
