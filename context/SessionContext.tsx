@@ -2,45 +2,54 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { supabase } from '../supabaseClient';
 import type { User, Company, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowance, Notification, AnyTable, UserData } from '../types';
 
-// Definición de la interfaz para el contexto de sesión
 interface Session {
     currentUser: User | null;
     companies: Company[];
-    activeCompany: Company | null; // Objeto de la empresa activa
+    activeCompany: Company | null;
     activePeriod: string;
     periods: { value: string; label: string; }[];
     isLoading: boolean;
     notifications: (Notification & { id: number })[];
-    // ... otros datos ...
     chartOfAccounts: ChartOfAccount[];
     subjects: Subject[];
+    costCenters: CostCenter[];
+    items: Item[];
+    employees: Employee[];
+    institutions: Institution[];
+    monthlyParameters: MonthlyParameter[];
     vouchers: Voucher[];
-    // ... etc
-
-    // Funciones
+    invoices: Invoice[];
+    feeInvoices: FeeInvoice[];
+    warehouseMovements: WarehouseMovement[];
+    payslips: Payslip[];
+    bankReconciliations: BankReconciliation[];
+    users: User[];
+    accountGroups: AccountGroup[];
+    familyAllowances: FamilyAllowance[];
     login: (email: string, pass: string) => Promise<User>;
     logout: () => void;
     addNotification: (notification: Notification) => void;
-    switchCompany: (id: number) => void; // Renombrada para mayor claridad
+    switchCompany: (id: number) => void;
     setActivePeriod: (period: string) => void;
-    refreshTable: <T extends keyof AnyTable>(tableName: T) => Promise<void>;
-    handleApiError: (error: any, context: string) => void;
     sendPasswordResetEmail: (email: string) => Promise<void>;
+    fetchDataForCompany: (companyId: number) => Promise<void>;
+    refreshTable: <T extends keyof AnyTable>(tableName: T) => Promise<void>;
     addUser: (userData: UserData, password: string, setLoadingMessage: (message: string) => void) => Promise<User>;
     updateUser: (user: User) => Promise<void>;
     deleteUser: (userId: string) => Promise<void>;
+    handleApiError: (error: any, context: string) => void;
 }
 
 const SessionContext = createContext<Session | undefined>(undefined);
 
-// Función para generar los períodos (sin cambios)
 const generatePeriods = () => {
     const periods = [];
     const startYear = new Date().getFullYear() - 2;
     for (let i = 0; i < 5; i++) {
         const year = startYear + i;
         for (let month = 1; month <= 12; month++) {
-            periods.push({ value: `${year}-${month.toString().padStart(2, '0')}`, label: `${month.toString().padStart(2, '0')}/${year}` });
+            const formattedMonth = month.toString().padStart(2, '0');
+            periods.push({ value: `${year}-${formattedMonth}`, label: `${formattedMonth}/${year}` });
         }
     }
     return periods.reverse();
@@ -49,58 +58,95 @@ const generatePeriods = () => {
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>([]);
+    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+    const [items, setItems] = useState<Item[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [institutions, setInstitutions] = useState<Institution[]>([]);
+    const [monthlyParameters, setMonthlyParameters] = useState<MonthlyParameter[]>([]);
+    const [vouchers, setVouchers] = useState<Voucher[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [feeInvoices, setFeeInvoices] = useState<FeeInvoice[]>([]);
+    const [warehouseMovements, setWarehouseMovements] = useState<WarehouseMovement[]>([]);
+    const [payslips, setPayslips] = useState<Payslip[]>([]);
+    const [bankReconciliations, setBankReconciliations] = useState<BankReconciliation[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
+    const [familyAllowances, setFamilyAllowances] = useState<FamilyAllowance[]>([]);
     const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(null);
-    const [activePeriod, setActivePeriodState] = useState<string>(() => `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`);
+    const [activePeriod, setActivePeriodState] = useState<string>(() => {
+        const today = new Date();
+        return `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    });
     const [periods] = useState(generatePeriods());
     const [isLoading, setIsLoading] = useState(true);
     const [notifications, setNotifications] = useState<(Notification & { id: number })[]>([]);
 
-    // Estados para los datos específicos de la empresa
-    const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>([]);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
-    // ... (otros estados de datos)
-    const [vouchers, setVouchers] = useState<Voucher[]>([]);
-
-    // Deriva el objeto de la empresa activa a partir del ID
     const activeCompany = useMemo(() => {
         return companies.find(c => c.id === activeCompanyId) || null;
     }, [companies, activeCompanyId]);
 
-    // Notificaciones y manejo de errores (sin cambios)
     const addNotification = (notification: Notification) => {
         const newId = Date.now();
         setNotifications(prev => [...prev, { ...notification, id: newId }]);
-        setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== newId)), 5000);
+        setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== newId));
+        }, 5000);
     };
-    const handleApiError = (error: any, context: string) => addNotification({ type: 'error', message: error.message || `Error desconocido ${context}` });
 
-    // Función para obtener todos los datos de una empresa
+    const handleApiError = (error: any, context: string) => {
+        const message = error.message || `Error desconocido ${context}`;
+        addNotification({ type: 'error', message });
+    };
+
     const fetchDataForCompany = async (companyId: number) => {
         if (!companyId) return;
-        addNotification({ type: 'info', message: `Sincronizando datos...` });
+        addNotification({ type: 'info', message: `Sincronizando datos para la empresa...` });
+
         try {
-            const tables: (keyof AnyTable)[] = ['chart_of_accounts', 'subjects', 'vouchers']; // Lista simplificada para el ejemplo
-            const promises = tables.map(tableName =>
+            const companySpecificTables: (keyof AnyTable)[] = [
+                'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
+                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+                'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
+                'account_groups', 'family_allowances'
+            ];
+
+            const promises = companySpecificTables.map(tableName =>
                 supabase.from(tableName).select('*').eq('company_id', companyId).then(({ data, error }) => {
-                    if (error) throw new Error(`Error en ${tableName}: ${error.message}`);
+                    if (error) {
+                        console.error(`Error fetching ${tableName} for company ${companyId}:`, error);
+                        throw new Error(`Error fetching ${tableName}: ${error.message}`);
+                    }
                     return { [tableName]: data || [] };
                 })
             );
-            const results = await Promise.all(promises);
-            const companyData = results.reduce((acc, current) => ({ ...acc, ...current }), {});
 
-            // Actualiza los estados
+            const results = await Promise.all(promises);
+            const companyData: { [key: string]: any[] } = results.reduce((acc, current) => ({ ...acc, ...current }), {});
+
             setChartOfAccounts(companyData.chart_of_accounts || []);
             setSubjects(companyData.subjects || []);
+            setCostCenters(companyData.cost_centers || []);
+            setItems(companyData.items || []);
+            setEmployees(companyData.employees || []);
+            setInstitutions(companyData.institutions || []);
+            setMonthlyParameters(companyData.monthly_parameters || []);
             setVouchers(companyData.vouchers || []);
-            
-            addNotification({ type: 'success', message: 'Datos sincronizados.' });
+            setInvoices(companyData.invoices || []);
+            setFeeInvoices(companyData.fee_invoices || []);
+            setWarehouseMovements(companyData.warehouse_movements || []);
+            setPayslips(companyData.payslips || []);
+            setBankReconciliations(companyData.bank_reconciliations || []);
+            setAccountGroups(companyData.account_groups || []);
+            setFamilyAllowances(companyData.family_allowances || []);
+
+            addNotification({ type: 'success', message: 'Datos sincronizados correctamente.' });
         } catch (error: any) {
-            handleApiError(error, 'al sincronizar datos');
+            handleApiError(error, 'al sincronizar los datos de la empresa');
         }
     };
-
-    // Carga de datos inicial al autenticar al usuario
+    
     const fetchInitialData = async (user: User) => {
         setIsLoading(true);
         try {
@@ -108,29 +154,38 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             if (companiesError) throw companiesError;
             setCompanies(companiesData || []);
 
+            if (user.role === 'System Administrator') {
+                const { data: usersData, error: usersError } = await supabase.from('users').select('*');
+                if (usersError) throw usersError;
+                setUsers(usersData || []);
+            }
+
             const userCompanies = (companiesData || []).filter(c => c.owner_id === user.id);
-            let companyToLoadId = activeCompanyId;
+            let companyToLoad: number | null = null;
 
             if (user.role === 'Accountant' && userCompanies.length > 0) {
-                if (!companyToLoadId || !userCompanies.some(c => c.id === companyToLoadId)) {
-                    const storedId = localStorage.getItem('activeCompanyId');
-                    companyToLoadId = storedId && userCompanies.some(c => c.id === Number(storedId)) ? Number(storedId) : userCompanies[0].id;
+                const storedCompanyId = localStorage.getItem('activeCompanyId');
+                const storedCompanyIdNum = storedCompanyId ? parseInt(storedCompanyId, 10) : null;
+
+                if (storedCompanyIdNum && userCompanies.some(c => c.id === storedCompanyIdNum)) {
+                    companyToLoad = storedCompanyIdNum;
+                } else {
+                    companyToLoad = userCompanies[0].id;
                 }
                 
-                if (companyToLoadId) {
-                    setActiveCompanyIdState(companyToLoadId);
-                    localStorage.setItem('activeCompanyId', String(companyToLoadId));
-                    await fetchDataForCompany(companyToLoadId);
+                if (companyToLoad) {
+                    setActiveCompanyIdState(companyToLoad);
+                    localStorage.setItem('activeCompanyId', String(companyToLoad));
+                    await fetchDataForCompany(companyToLoad);
                 }
             }
         } catch (error: any) {
-            handleApiError(error, "al cargar datos iniciales");
+            handleApiError(error, "al cargar los datos iniciales");
         } finally {
             setIsLoading(false);
         }
     };
-    
-    // Función para cambiar de empresa
+
     const switchCompany = (id: number) => {
         if (id === activeCompanyId) return;
         localStorage.setItem('activeCompanyId', id.toString());
@@ -143,53 +198,196 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setActivePeriodState(period);
     };
 
-    // ... (resto de funciones: refreshTable, login, logout, etc. sin cambios significativos en su lógica principal)
-    const login = async (email: string, pass: string): Promise<User> => { /* ... */ return {} as User; };
-    const logout = async () => { /* ... */ };
-    const refreshTable = async <T extends keyof AnyTable>(tableName: T) => { /* ... */ };
-    const sendPasswordResetEmail = async (email: string) => { /* ... */ };
-    const addUser = async (userData: UserData, password: string, setLoadingMessage: (message: string) => void): Promise<User> => { /* ... */ return {} as User; };
-    const updateUser = async (user: User) => { /* ... */ };
-    const deleteUser = async (userId: string) => { /* ... */ };
+    const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
+        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users') {
+            console.warn(`Cannot refresh ${tableName} without an active company.`);
+            return;
+        }
     
-    // Efecto para gestionar el estado de autenticación
+        console.log(`Refreshing table: ${tableName}`);
+        try {
+            let query = supabase.from(tableName).select('*');
+    
+            const companySpecificTables: (keyof AnyTable)[] = [
+                'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
+                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+                'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
+                'account_groups', 'family_allowances'
+            ];
+    
+            if (activeCompanyId && companySpecificTables.includes(tableName)) {
+                query = query.eq('company_id', activeCompanyId);
+            }
+    
+            const { data, error } = await query;
+            if (error) throw error;
+    
+            const setters: Record<keyof AnyTable, React.Dispatch<React.SetStateAction<any>>> = {
+                companies: setCompanies,
+                chart_of_accounts: setChartOfAccounts,
+                subjects: setSubjects,
+                cost_centers: setCostCenters,
+                items: setItems,
+                employees: setEmployees,
+                institutions: setInstitutions,
+                monthly_parameters: setMonthlyParameters,
+                vouchers: setVouchers,
+                invoices: setInvoices,
+                fee_invoices: setFeeInvoices,
+                warehouse_movements: setWarehouseMovements,
+                payslips: setPayslips,
+                bank_reconciliations: setBankReconciliations,
+                users: setUsers,
+                account_groups: setAccountGroups,
+                family_allowances: setFamilyAllowances,
+            };
+    
+            const setter = setters[tableName];
+            if (setter) {
+                setter(data || []);
+                addNotification({ type: 'success', message: `Tabla '${tableName}' actualizada.` });
+            } else {
+                 console.warn(`No state setter found for table: ${tableName}`);
+            }
+        } catch (error: any) {
+            handleApiError(error, `al refrescar la tabla ${tableName}`);
+        }
+    };
+
+    const addUser = async (userData: UserData, password: string, setLoadingMessage: (message: string) => void): Promise<User> => {
+        setLoadingMessage("Invocando función de creación de usuario...");
+        const { data, error } = await supabase.functions.invoke('create-user', {
+            body: { userData, password },
+        });
+
+        if (error) {
+            throw new Error(`Error en la función: ${error.message}`);
+        }
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        setLoadingMessage("Usuario creado, actualizando la tabla local...");
+        await refreshTable('users');
+        return data.user;
+    };
+
+    const updateUser = async (user: User) => {
+        const { error } = await supabase.functions.invoke('update-user', {
+            body: { userId: user.id, updates: user },
+        });
+        if (error) throw error;
+        await refreshTable('users');
+    };
+
+    const deleteUser = async (userId: string) => {
+        const { error } = await supabase.functions.invoke('delete-user', {
+            body: { userId },
+        });
+        if (error) throw error;
+        await refreshTable('users');
+    };
+
     useEffect(() => {
         const checkUser = async () => {
+            setIsLoading(true);
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
-                const { data: userProfile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+                const { data: userProfile, error } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+                if (error) throw new Error(`Failed to fetch user profile: ${error.message}`);
                 if (userProfile) {
                     setCurrentUser(userProfile);
                     await fetchInitialData(userProfile);
                 }
             } else {
-                 setIsLoading(false);
+                setIsLoading(false);
             }
         };
         checkUser();
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user) {
-                 const { data: userProfile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-                 if (userProfile) {
+
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (_event === 'SIGNED_IN' && session?.user) {
+                setIsLoading(true);
+                const { data: userProfile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+                if (userProfile) {
                     setCurrentUser(userProfile);
                     await fetchInitialData(userProfile);
-                 }
-            } else if (event === 'SIGNED_OUT') {
+                }
+            } else if (_event === 'SIGNED_OUT') {
                 setCurrentUser(null);
                 setCompanies([]);
+                setChartOfAccounts([]);
+                setSubjects([]);
+                setCostCenters([]);
+                setItems([]);
+                setEmployees([]);
+                setInstitutions([]);
+                setMonthlyParameters([]);
+                setVouchers([]);
+                setInvoices([]);
+                setFeeInvoices([]);
+                setWarehouseMovements([]);
+                setPayslips([]);
+                setBankReconciliations([]);
+                setUsers([]);
+                setAccountGroups([]);
+                setFamilyAllowances([]);
                 setActiveCompanyIdState(null);
-                // ... (limpiar otros estados)
+                setIsLoading(false);
             }
         });
-        return () => { authListener.subscription.unsubscribe(); };
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
     }, []);
+
+    const login = async (email: string, pass: string) => {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) {
+            if (error.message.includes("Invalid login credentials")) {
+                throw new Error("El correo o la contraseña no son correctos. Por favor, inténtelo de nuevo.");
+            }
+            throw error;
+        }
+
+        if (!data.user) throw new Error('Login failed: No user found.');
+        
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+
+        if (profileError) throw profileError;
+        if (!userProfile) throw new Error('Login failed: No user profile found.');
+        
+        // Ya no se llama a fetchInitialData aquí para evitar la condición de carrera.
+        // El listener onAuthStateChange se encargará de ello.
+        return userProfile;
+    };
+
+    const logout = async () => {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+    };
+
+    const sendPasswordResetEmail = async (email: string) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+             redirectTo: window.location.origin + '/update-password',
+        });
+        if (error) throw error;
+    };
 
     return (
         <SessionContext.Provider value={{
-            currentUser, companies, activeCompany, activePeriod, periods, isLoading, notifications,
-            chartOfAccounts, subjects, vouchers, /*... otros datos ...*/
-            login, logout, addNotification, switchCompany, setActivePeriod, refreshTable, handleApiError,
-            sendPasswordResetEmail, addUser, updateUser, deleteUser
+            currentUser, companies, chartOfAccounts, subjects, costCenters, items, employees,
+            institutions, monthlyParameters, vouchers, invoices, feeInvoices, warehouseMovements,
+            payslips, bankReconciliations, users, accountGroups, familyAllowances, activeCompany, activeCompanyId: activeCompany?.id || null,
+            activePeriod, periods, isLoading, notifications, login, logout, addNotification,
+            switchCompany, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
+            addUser, updateUser, deleteUser, handleApiError
         }}>
             {children}
         </SessionContext.Provider>
