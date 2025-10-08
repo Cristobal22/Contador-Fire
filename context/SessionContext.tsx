@@ -56,7 +56,6 @@ const generatePeriods = () => {
     return periods.reverse();
 };
 
-
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -92,10 +91,97 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             setNotifications(prev => prev.filter(n => n.id !== newId));
         }, 5000);
     };
-    
+
     const handleApiError = (error: any, context: string) => {
         const message = error.message || `Error desconocido ${context}`;
         addNotification({ type: 'error', message });
+    };
+
+    const fetchDataForCompany = async (companyId: number) => {
+        if (!companyId) return;
+        addNotification({ type: 'info', message: `Sincronizando datos para la empresa...` });
+
+        try {
+            const companySpecificTables: (keyof AnyTable)[] = [
+                'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
+                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+                'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
+                'account_groups', 'family_allowances'
+            ];
+
+            const promises = companySpecificTables.map(tableName =>
+                supabase.from(tableName).select('*').eq('company_id', companyId).then(({ data, error }) => {
+                    if (error) {
+                        console.error(`Error fetching ${tableName} for company ${companyId}:`, error);
+                        throw new Error(`Error fetching ${tableName}: ${error.message}`);
+                    }
+                    return { [tableName]: data || [] };
+                })
+            );
+
+            const results = await Promise.all(promises);
+            const companyData: { [key: string]: any[] } = results.reduce((acc, current) => ({ ...acc, ...current }), {});
+
+            setChartOfAccounts(companyData.chart_of_accounts || []);
+            setSubjects(companyData.subjects || []);
+            setCostCenters(companyData.cost_centers || []);
+            setItems(companyData.items || []);
+            setEmployees(companyData.employees || []);
+            setInstitutions(companyData.institutions || []);
+            setMonthlyParameters(companyData.monthly_parameters || []);
+            setVouchers(companyData.vouchers || []);
+            setInvoices(companyData.invoices || []);
+            setFeeInvoices(companyData.fee_invoices || []);
+            setWarehouseMovements(companyData.warehouse_movements || []);
+            setPayslips(companyData.payslips || []);
+            setBankReconciliations(companyData.bank_reconciliations || []);
+            setAccountGroups(companyData.account_groups || []);
+            setFamilyAllowances(companyData.family_allowances || []);
+
+            addNotification({ type: 'success', message: 'Datos sincronizados correctamente.' });
+        } catch (error: any) {
+            handleApiError(error, 'al sincronizar los datos de la empresa');
+        }
+    };
+    
+    const fetchInitialData = async (user: User) => {
+        setIsLoading(true);
+        try {
+            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*');
+            if (companiesError) throw companiesError;
+            setCompanies(companiesData || []);
+
+            if (user.role === 'System Administrator') {
+                const { data: usersData, error: usersError } = await supabase.from('users').select('*');
+                if (usersError) throw usersError;
+                setUsers(usersData || []);
+            }
+
+            const userCompanies = (companiesData || []).filter(c => c.owner_id === user.id);
+            let companyToLoad: number | null = null;
+
+            if (user.role === 'Accountant' && userCompanies.length > 0) {
+                const storedCompanyId = localStorage.getItem('activeCompanyId');
+                const storedCompanyIdNum = storedCompanyId ? parseInt(storedCompanyId, 10) : null;
+
+                if (storedCompanyIdNum && userCompanies.some(c => c.id === storedCompanyIdNum)) {
+                    companyToLoad = storedCompanyIdNum;
+                } else {
+                    companyToLoad = userCompanies[0].id;
+                }
+                
+                setActiveCompanyIdState(companyToLoad);
+                localStorage.setItem('activeCompanyId', String(companyToLoad));
+
+                if (companyToLoad) {
+                    await fetchDataForCompany(companyToLoad);
+                }
+            }
+        } catch (error: any) {
+            handleApiError(error, "al cargar los datos iniciales");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const setActiveCompanyId = (id: number) => {
@@ -109,78 +195,30 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setActivePeriodState(period);
     };
 
-    const fetchData = async (user: User) => {
+    const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
+        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users') {
+            console.warn(`Cannot refresh ${tableName} without an active company.`);
+            return;
+        }
+    
+        console.log(`Refreshing table: ${tableName}`);
         try {
-            const baseTables: (keyof AnyTable)[] = [
-                'companies', 'chart_of_accounts', 'subjects', 'cost_centers', 'items',
-                'employees', 'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+            let query = supabase.from(tableName).select('*');
+    
+            const companySpecificTables: (keyof AnyTable)[] = [
+                'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
+                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
                 'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
                 'account_groups', 'family_allowances'
             ];
-
-            const tableNames = [...baseTables];
-            if (user.role === 'System Administrator') {
-                tableNames.push('users');
+    
+            if (activeCompanyId && companySpecificTables.includes(tableName)) {
+                query = query.eq('company_id', activeCompanyId);
             }
-            
-            const promises = tableNames.map(tableName =>
-                supabase.from(tableName).select('*').then(({ data, error }) => {
-                    if (error) {
-                        console.error(`Error fetching ${tableName}:`, error);
-                        throw new Error(`Error fetching ${tableName}: ${error.message}`);
-                    }
-                    return { [tableName]: data || [] };
-                })
-            );
-
-            const results = await Promise.all(promises);
-            const allData: { [key: string]: any[] } = results.reduce((acc, current) => ({ ...acc, ...current }), {});
-            
-            setCompanies(allData.companies || []);
-            setChartOfAccounts(allData.chart_of_accounts || []);
-            setSubjects(allData.subjects || []);
-            setCostCenters(allData.cost_centers || []);
-            setItems(allData.items || []);
-            setEmployees(allData.employees || []);
-            setInstitutions(allData.institutions || []);
-            setMonthlyParameters(allData.monthly_parameters || []);
-            setVouchers(allData.vouchers || []);
-            setInvoices(allData.invoices || []);
-            setFeeInvoices(allData.fee_invoices || []);
-            setWarehouseMovements(allData.warehouse_movements || []);
-            setPayslips(allData.payslips || []);
-            setBankReconciliations(allData.bank_reconciliations || []);
-            setAccountGroups(allData.account_groups || []);
-            setFamilyAllowances(allData.family_allowances || []);
-            if (allData.users) setUsers(allData.users);
-
-            const storedCompanyId = localStorage.getItem('activeCompanyId');
-            const userCompanies = (allData.companies || []).filter(c => c.owner_id === user.id);
-            if (user.role === 'Accountant' && userCompanies.length > 0) {
-                const companyId = storedCompanyId ? parseInt(storedCompanyId, 10) : userCompanies[0].id;
-                if (userCompanies.some(c => c.id === companyId)) {
-                     setActiveCompanyIdState(companyId);
-                } else {
-                     setActiveCompanyIdState(userCompanies[0].id);
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching initial data:", error);
-            addNotification({ type: 'error', message: 'Error al cargar datos. Intente recargar.' });
-        }
-    };
-
-
-    const fetchDataForCompany = async (companyId: number) => {
-        addNotification({ type: 'info', message: `Sincronizando datos para la empresa...`});
-    };
-
-    const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
-        console.log(`Refreshing table: ${tableName}`);
-        try {
-            const { data, error } = await supabase.from(tableName).select('*');
+    
+            const { data, error } = await query;
             if (error) throw error;
-
+    
             const setters: Record<keyof AnyTable, React.Dispatch<React.SetStateAction<any>>> = {
                 companies: setCompanies,
                 chart_of_accounts: setChartOfAccounts,
@@ -200,7 +238,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 account_groups: setAccountGroups,
                 family_allowances: setFamilyAllowances,
             };
-
+    
             const setter = setters[tableName];
             if (setter) {
                 setter(data || []);
@@ -209,7 +247,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                  console.warn(`No state setter found for table: ${tableName}`);
             }
         } catch (error: any) {
-            addNotification({ type: 'error', message: `Error al refrescar la tabla ${tableName}: ${error.message}` });
+            handleApiError(error, `al refrescar la tabla ${tableName}`);
         }
     };
 
@@ -248,7 +286,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('users');
     };
 
-
     useEffect(() => {
         const checkUser = async () => {
             setIsLoading(true);
@@ -268,7 +305,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
                     if (userProfile) {
                         setCurrentUser(userProfile);
-                        await fetchData(userProfile);
+                        await fetchInitialData(userProfile);
                     }
                 }
             } catch (error) {
@@ -287,7 +324,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 const { data: userProfile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
                 if(userProfile) {
                     setCurrentUser(userProfile);
-                    await fetchData(userProfile);
+                    await fetchInitialData(userProfile);
                 }
                  setIsLoading(false);
             } else if (_event === 'SIGNED_OUT') {
@@ -340,7 +377,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (!userProfile) throw new Error('Login failed: No user profile found.');
 
         setCurrentUser(userProfile);
-        await fetchData(userProfile);
+        await fetchInitialData(userProfile);
         return userProfile;
     };
 
@@ -355,7 +392,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         });
         if (error) throw error;
     };
-
 
     return (
         <SessionContext.Provider value={{
