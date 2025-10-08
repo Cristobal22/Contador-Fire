@@ -30,7 +30,7 @@ const WarehouseMovementsView: React.FC<{ type: 'Entrada' | 'Salida' }> = ({ type
         }
     };
 
-    const filteredMovements = session.warehouseMovements.filter(m => m.type === type);
+    const filteredMovements = (session.warehouseMovements || []).filter(m => m.type === type);
 
     return (
         <SimpleReportView title={`${type}s a Bodega`}>

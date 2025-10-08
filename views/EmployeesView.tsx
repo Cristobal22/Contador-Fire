@@ -6,8 +6,8 @@ import type { Employee } from '../types';
 const EmployeesView = () => {
     const session = useSession();
     
-    const afpOptions = session.institutions.filter(i => i.type === 'AFP').map(i => ({ value: i.id, label: i.name }));
-    const healthOptions = session.institutions.filter(i => i.type === 'Isapre' || i.type === 'Fonasa').map(i => ({ value: i.id, label: i.name }));
+    const afpOptions = (session.institutions || []).filter(i => i.type === 'AFP').map(i => ({ value: i.id, label: i.name }));
+    const healthOptions = (session.institutions || []).filter(i => i.type === 'Isapre' || i.type === 'Fonasa').map(i => ({ value: i.id, label: i.name }));
 
     return (
         <CrudView<Employee>

@@ -23,7 +23,7 @@ const InvoicesView: React.FC<{ type: 'Compra' | 'Venta' }> = ({ type }) => {
     };
     
     const getSubjectName = (id: number) => subjects.find(s => s.id === id)?.name || 'N/A';
-    const filteredInvoices = invoices.filter(i => i.type === type);
+    const filteredInvoices = (invoices || []).filter(i => i.type === type);
 
     return (
         <div>

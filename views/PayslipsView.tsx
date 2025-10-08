@@ -174,11 +174,11 @@ const PayslipsView = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     const employeesWithPayslip = useMemo(() => 
-        new Set(session.payslips.filter(p => p.period === session.activePeriod).map(p => p.employeeId)),
+        new Set((session.payslips || []).filter(p => p.period === session.activePeriod).map(p => p.employeeId)),
         [session.payslips, session.activePeriod]
     );
 
-    const availableEmployees = session.employees.filter(e => !employeesWithPayslip.has(e.id));
+    const availableEmployees = (session.employees || []).filter(e => !employeesWithPayslip.has(e.id));
     const employeeOptions = availableEmployees.map(e => ({ value: e.id, label: e.name }));
 
     const handleCreate = async (data: { employeeId: number }) => {

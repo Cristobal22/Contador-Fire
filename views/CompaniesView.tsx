@@ -7,7 +7,7 @@ const CompaniesView = () => {
     const session = useSession();
     const { currentUser } = session;
     
-    const userCompanies = session.companies.filter(c => currentUser && c.owner_id === currentUser.id);
+    const userCompanies = (session.companies || []).filter(c => currentUser && c.owner_id === currentUser.id);
 
     return (
         <CrudView<Company>

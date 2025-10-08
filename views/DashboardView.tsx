@@ -45,11 +45,11 @@ const DashboardView = () => {
 
     const expenseData = useMemo(() => {
         // 1. Filter for expense accounts (type 'Resultado').
-        const expenseAccounts = accounts.filter(a => a.type === 'Resultado');
+        const expenseAccounts = (accounts || []).filter(a => a.type === 'Resultado');
         const expenseAccountIds = new Set(expenseAccounts.map(a => a.id));
 
         // 2. Filter vouchers for the active period.
-        const periodVouchers = vouchers.filter(v => v.date.startsWith(activePeriod));
+        const periodVouchers = (vouchers || []).filter(v => v.date.startsWith(activePeriod));
 
         // 3. Aggregate expenses.
         const totals = new Map<string, number>();
