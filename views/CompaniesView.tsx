@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
+import { formatRut } from '../utils/format';
 import type { Company } from '../types';
 
 const CompaniesView = () => {
@@ -13,7 +14,7 @@ const CompaniesView = () => {
         <CrudView<Company>
             title="Empresa"
             columns={[
-                { key: 'rut', header: 'RUT' },
+                { key: 'rut', header: 'RUT', render: (rut) => formatRut(rut) },
                 { key: 'name', header: 'Razón Social' },
                 { key: 'address', header: 'Dirección' }
             ]}

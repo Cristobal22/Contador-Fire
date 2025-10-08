@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
+import { formatRut } from '../utils/format';
 import type { Subject } from '../types';
 
 const SubjectsView = () => {
@@ -9,7 +10,7 @@ const SubjectsView = () => {
         <CrudView<Subject>
             title="Sujeto"
             columns={[
-                { key: 'rut', header: 'RUT' },
+                { key: 'rut', header: 'RUT', render: (rut) => formatRut(rut) },
                 { key: 'name', header: 'Nombre' },
                 { key: 'type', header: 'Tipo' }
             ]}

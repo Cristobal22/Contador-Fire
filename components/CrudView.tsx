@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { GenericForm } from './Forms';
 import { useSession } from '../context/SessionContext';
+import { validateRut } from '../utils/format';
 
 type CrudViewProps<T extends { id: number | string }> = {
     title: string;
     columns: {
-        key: keyof T | (string & {}); // Allow string for custom keys like 'stock'
+        key: keyof T | (string & {});
         header: string;
         render?: (value: any, row: T) => React.ReactNode;
     }[];
@@ -16,57 +17,6 @@ type CrudViewProps<T extends { id: number | string }> = {
     onDelete: (id: number | string) => Promise<void>;
     formFields: { name: string, label: string, type: string, options?: any[] }[];
 };
-
-// --- RUT Validation and Formatting Utilities ---
-
-/**
- * Validates a Chilean RUT.
- * @param rutCompleto The RUT to validate, in the format '12345678-9'.
- * @returns True if the RUT is valid, false otherwise.
- */
-const validateRut = (rutCompleto: string): boolean => {
-  if (!/^[0-9]+-[0-9kK]$/.test(rutCompleto)) {
-      return false;
-  }
-  const [cuerpo, dv] = rutCompleto.split('-');
-  let suma = 0;
-  let multiplo = 2;
-  for (let i = cuerpo.length - 1; i >= 0; i--) {
-    suma += multiplo * parseInt(cuerpo.charAt(i), 10);
-    if (multiplo < 7) {
-      multiplo++;
-    } else {
-      multiplo = 2;
-    }
-  }
-  const dvEsperado = 11 - (suma % 11);
-  const dvFinal = dvEsperado === 11 ? '0' : dvEsperado === 10 ? 'K' : dvEsperado.toString();
-  return dvFinal === dv.toUpperCase();
-};
-
-/**
- * Formats a RUT string to the standard Chilean format (e.g., 12.345.678-9).
- * @param rut The raw RUT string.
- * @returns The formatted RUT string.
- */
-const formatRut = (rut: string): string => {
-    if (!rut) return '';
-    const cleanRut = rut.replace(/[^0-9kK]/gi, '').toUpperCase();
-    if (cleanRut.length < 2) return cleanRut;
-    
-    let body = cleanRut.slice(0, -1);
-    const dv = cleanRut.slice(-1);
-
-    let formattedBody = '';
-    while (body.length > 3) {
-        formattedBody = '.' + body.slice(-3) + formattedBody;
-        body = body.slice(0, -3);
-    }
-    formattedBody = body + formattedBody;
-
-    return `${formattedBody}-${dv}`;
-};
-
 
 export const CrudView = <T extends { id: number | string }>({ title, columns, data, onSave, onUpdate, onDelete, formFields }: CrudViewProps<T>) => {
     const { addNotification, handleApiError } = useSession();
@@ -113,30 +63,13 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
         setIsLoading(true);
         const isEditing = editingItem && 'id' in editingItem;
         
-        // --- RUT VALIDATION ---
         if ('rut' in formData && typeof (formData as any).rut === 'string' && (formData as any).rut) {
-            const rutValue = (formData as any).rut;
-            const cleanRut = rutValue.replace(/[^0-9kK]/gi, '').toUpperCase();
-            
-            if (cleanRut.length < 2) {
-                 addNotification({ type: 'error', message: 'El RUT está incompleto.' });
-                 setIsLoading(false);
-                 return;
-            }
-            
-            const body = cleanRut.slice(0, -1);
-            const dv = cleanRut.slice(-1);
-            
-            if (!validateRut(`${body}-${dv}`)) {
+            if (!validateRut((formData as any).rut)) {
                 addNotification({ type: 'error', message: 'El RUT ingresado no es válido. Verifique el RUT y el dígito verificador.' });
                 setIsLoading(false);
                 return;
             }
-
-            // Format for display and storage
-            (formData as any).rut = formatRut(rutValue);
         }
-        // --- END RUT VALIDATION ---
 
         try {
             if (isEditing) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
+import { formatRut } from '../utils/format';
 import type { Employee } from '../types';
 
 const EmployeesView = () => {
@@ -13,7 +14,7 @@ const EmployeesView = () => {
         <CrudView<Employee>
             title="Empleado"
             columns={[
-                { key: 'rut', header: 'RUT' },
+                { key: 'rut', header: 'RUT', render: (rut) => formatRut(rut) },
                 { key: 'name', header: 'Nombre' },
                 { key: 'position', header: 'Cargo' },
                 { key: 'baseSalary', header: 'Sueldo Base', render: (value) => value.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) },

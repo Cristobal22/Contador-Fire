@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
+import { unformatRut } from '../utils/format';
 import type { User, Company, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowance, Notification, AnyTable, UserData } from '../types';
 
 interface Session {
@@ -385,7 +386,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
         try {
-            const newCompany = { ...company, owner_id: currentUser.id };
+            const newCompany = { ...company, rut: unformatRut(company.rut), owner_id: currentUser.id };
             const { error } = await supabase.from('companies').insert(newCompany);
             if (error) throw error;
             addNotification({ type: 'success', message: 'Empresa agregada correctamente.' });
@@ -397,7 +398,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const updateCompany = async (company: Company) => {
         try {
-            const { error } = await supabase.from('companies').update(company).eq('id', company.id);
+            const companyToUpdate = { ...company, rut: unformatRut(company.rut) };
+            const { error } = await supabase.from('companies').update(companyToUpdate).eq('id', company.id);
             if (error) throw error;
             addNotification({ type: 'success', message: 'Empresa actualizada correctamente.' });
             await refreshTable('companies');

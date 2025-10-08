@@ -1,10 +1,14 @@
 
 export const formatRut = (rut: string): string => {
+    if (!rut) return '';
     let value = rut.replace(/\./g, '').replace('-', '');
-    if (value.match(/^(\d{2})(\d{3})(\d{3})([0-9kK])$/)) {
-        value = value.replace(/^(\d{2})(\d{3})(\d{3})([0-9kK])$/, '$1.$2.$3-$4');
-    } else if (value.match(/^(\d)(\d{3})(\d{3})([0-9kK])$/)) {
-        value = value.replace(/^(\d)(\d{3})(\d{3})([0-9kK])$/, '$1.$2.$3-$4');
-    }
-    return value;
+    const body = value.slice(0, -1);
+    const verifier = value.slice(-1).toUpperCase();
+    let formattedBody = body.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    return `${formattedBody}-${verifier}`;
+};
+
+export const unformatRut = (rut: string): string => {
+    if (!rut) return '';
+    return rut.replace(/\./g, '').replace('-', '');
 };
