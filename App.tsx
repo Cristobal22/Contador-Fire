@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'rea
 import { SessionProvider, useSession } from './context/SessionContext';
 import { Sidebar } from './components/Navigation';
 import { navStructure } from './navigation';
+import { adminNavStructure } from './navigation.admin';
 import type { NavStructure, Notification } from './types';
 import { SearchModal } from './components/SearchModal';
 
@@ -250,14 +251,19 @@ const getPathBreadcrumb = (pathname: string, navData: NavStructure, parentPath =
 
 
 const AppLayout = () => {
+    const { currentUser } = useSession();
     const location = useLocation();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const breadcrumb = getPathBreadcrumb(location.pathname, navStructure) || 'Dashboard';
+    
+    const isSystemAdmin = currentUser?.role === 'System Administrator';
+    const currentNavStructure = isSystemAdmin ? adminNavStructure : navStructure;
+
+    const breadcrumb = getPathBreadcrumb(location.pathname, currentNavStructure) || 'Dashboard';
     const title = breadcrumb.split(' > ').pop();
 
     return (
         <div style={styles.appContainer}>
-            <Sidebar />
+            <Sidebar navStructure={currentNavStructure} />
             <div style={styles.mainContentFlow}>
                 <Header onSearchClick={() => setIsSearchOpen(true)} />
                 <main style={styles.mainContent}>
@@ -299,52 +305,54 @@ const AuthWrapper = () => {
                 <Route path="dashboard" element={<DashboardView />} />
                 
                 {/* Main application routes available to all logged-in users (Accountants and Admins) */}
-                <>
-                    {/* Contabilidad */}
-                    <Route path="contabilidad/movimientos/comprobantes" element={<VouchersView />} />
-                    <Route path="contabilidad/movimientos/compras" element={<InvoicesView type="Compra" />} />
-                    <Route path="contabilidad/movimientos/ventas" element={<InvoicesView type="Venta" />} />
-                    <Route path="contabilidad/movimientos/honorarios" element={<FeeInvoicesView />} />
-                    <Route path="contabilidad/movimientos/conciliacion-bancaria" element={<BankReconciliationView />} />
-                    <Route path="contabilidad/maestros/plan-de-cuentas" element={<ChartOfAccountsView />} />
-                    <Route path="contabilidad/maestros/grupos-de-cuentas" element={<AccountGroupsView />} />
-                    <Route path="contabilidad/maestros/sujetos" element={<SubjectsView />} />
-                    <Route path="contabilidad/maestros/centros-de-costos" element={<CostCentersView />} />
-                    
-                    {/* Inventario y Costos */}
-                    <Route path="inventario-y-costos/gestion/items" element={<ItemsView />} />
-                    <Route path="inventario-y-costos/gestion/entradas-a-bodega" element={<WarehouseMovementsView type="Entrada" />} />
-                    <Route path="inventario-y-costos/gestion/salidas-de-bodega" element={<WarehouseMovementsView type="Salida" />} />
+                {!isSystemAdmin && (
+                    <>
+                        {/* Contabilidad */}
+                        <Route path="contabilidad/movimientos/comprobantes" element={<VouchersView />} />
+                        <Route path="contabilidad/movimientos/compras" element={<InvoicesView type="Compra" />} />
+                        <Route path="contabilidad/movimientos/ventas" element={<InvoicesView type="Venta" />} />
+                        <Route path="contabilidad/movimientos/honorarios" element={<FeeInvoicesView />} />
+                        <Route path="contabilidad/movimientos/conciliacion-bancaria" element={<BankReconciliationView />} />
+                        <Route path="contabilidad/maestros/plan-de-cuentas" element={<ChartOfAccountsView />} />
+                        <Route path="contabilidad/maestros/grupos-de-cuentas" element={<AccountGroupsView />} />
+                        <Route path="contabilidad/maestros/sujetos" element={<SubjectsView />} />
+                        <Route path="contabilidad/maestros/centros-de-costos" element={<CostCentersView />} />
+                        
+                        {/* Inventario y Costos */}
+                        <Route path="inventario-y-costos/gestion/items" element={<ItemsView />} />
+                        <Route path="inventario-y-costos/gestion/entradas-a-bodega" element={<WarehouseMovementsView type="Entrada" />} />
+                        <Route path="inventario-y-costos/gestion/salidas-de-bodega" element={<WarehouseMovementsView type="Salida" />} />
 
-                    {/* Remuneraciones */}
-                    <Route path="remuneraciones/movimientos/ficha-de-personal" element={<EmployeesView />} />
-                    <Route path="remuneraciones/movimientos/liquidaciones" element={<PayslipsView />} />
-                    <Route path="remuneraciones/procesos/importar-previred" element={<PreviredImportView />} />
-                    <Route path="remuneraciones/maestros/instituciones" element={<InstitutionsView />} />
-                    <Route path="remuneraciones/maestros/parametros-asig-familiar" element={<FamilyAllowanceView />} />
-                    <Route path="remuneraciones/maestros/parametros-iut" element={<IncomeTaxParametersView />} />
+                        {/* Remuneraciones */}
+                        <Route path="remuneraciones/movimientos/ficha-de-personal" element={<EmployeesView />} />
+                        <Route path="remuneraciones/movimientos/liquidaciones" element={<PayslipsView />} />
+                        <Route path="remuneraciones/procesos/importar-previred" element={<PreviredImportView />} />
+                        <Route path="remuneraciones/maestros/instituciones" element={<InstitutionsView />} />
+                        <Route path="remuneraciones/maestros/parametros-asig-familiar" element={<FamilyAllowanceView />} />
+                        <Route path="remuneraciones/maestros/parametros-iut" element={<IncomeTaxParametersView />} />
 
-                    {/* Config shared between roles */}
-                    <Route path="configuracion/general/empresas" element={<CompaniesView />} />
-                    <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
-
-                    {/* Reports and Processes */}
-                    <Route path="contabilidad/informes/libro-diario" element={<JournalLedgerView />} />
-                    <Route path="contabilidad/informes/libro-mayor" element={<GeneralLedgerView />} />
-                    <Route path="contabilidad/informes/balances" element={<BalancesView />} />
-                    <Route path="contabilidad/informes/balance-general" element={<BalanceSheetView />} />
-                    <Route path="contabilidad/informes/resumen-mensual-iva" element={<MonthlyVatSummaryView />} />
-                    <Route path="inventario-y-costos/informes/informe-items" element={<InventoryReportView />} />
-                    <Route path="remuneraciones/informes/libro-remuneraciones" element={<PayrollLedgerView />} />
-                    <Route path="remuneraciones/informes/archivo-previred" element={<PreviredFileView />} />
-                    <Route path="remuneraciones/informes/certificado-remuneraciones" element={<RemunerationCertificateView />} />
-                    
-                    <Route path="procesos-criticos/centralizacion/centralizacion-remuneraciones" element={<PayrollCentralizationView />} />
-                    <Route path="procesos-criticos/centralizacion/centralizacion-rcv-sii" element={<SiiCentralizationView />} />
-                    <Route path="procesos-criticos/cierres/cierre-mensual" element={<MonthlyClosingView />} />
-                </>
+                        {/* Reports and Processes */}
+                        <Route path="contabilidad/informes/libro-diario" element={<JournalLedgerView />} />
+                        <Route path="contabilidad/informes/libro-mayor" element={<GeneralLedgerView />} />
+                        <Route path="contabilidad/informes/balances" element={<BalancesView />} />
+                        <Route path="contabilidad/informes/balance-general" element={<BalanceSheetView />} />
+                        <Route path="contabilidad/informes/resumen-mensual-iva" element={<MonthlyVatSummaryView />} />
+                        <Route path="inventario-y-costos/informes/informe-items" element={<InventoryReportView />} />
+                        <Route path="remuneraciones/informes/libro-remuneraciones" element={<PayrollLedgerView />} />
+                        <Route path="remuneraciones/informes/archivo-previred" element={<PreviredFileView />} />
+                        <Route path="remuneraciones/informes/certificado-remuneraciones" element={<RemunerationCertificateView />} />
+                        
+                        <Route path="procesos-criticos/centralizacion/centralizacion-remuneraciones" element={<PayrollCentralizationView />} />
+                        <Route path="procesos-criticos/centralizacion/centralizacion-rcv-sii" element={<SiiCentralizationView />} />
+                        <Route path="procesos-criticos/cierres/cierre-mensual" element={<MonthlyClosingView />} />
+                    </>
+                )}
                 
-                 {/* Admin-Only Routes */}
+                {/* Shared Routes */}
+                <Route path="configuracion/general/empresas" element={<CompaniesView />} />
+                <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
+
+                {/* Admin-Only Routes */}
                 {isSystemAdmin && (
                     <Route path="configuracion/general/usuarios" element={<UsersView />} />
                 )}

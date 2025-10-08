@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { NavStructure, NavItemDefinition } from '../types';
-import { navStructure } from '../navigation';
 import { useSession } from '../context/SessionContext';
 
 const styles = {
@@ -43,21 +42,12 @@ const styles = {
     } as React.CSSProperties,
 };
 
-/**
- * Custom hook to manage the state of collapsible menus.
- * It uses a path-based key (e.g., "Contabilidad>Movimientos") to ensure uniqueness
- * and initializes top-level menus to be open by default.
- * @param navData The navigation structure.
- * @returns An object with the current state of all menus and a function to toggle them.
- */
 const useMenuState = (navData: NavStructure) => {
-    // This function runs only once on initial render thanks to lazy initialization in useState.
     const getInitialState = () => {
         const buildStateRecursively = (data: NavStructure, parentKey = ''): Record<string, boolean> => {
             return Object.entries(data).reduce((acc, [key, value]) => {
                 const currentKey = parentKey ? `${parentKey}>${key}` : key;
                 if ('children' in value && Object.keys(value.children).length > 0) {
-                    // Top-level menus (no parent) are open by default. Sub-menus are closed.
                     acc[currentKey] = parentKey === '';
                     Object.assign(acc, buildStateRecursively(value.children, currentKey));
                 }
@@ -113,18 +103,15 @@ const NavMenu: React.FC<NavMenuProps> = ({
     return (
         <ul style={styles.sidebarNavList}>
             {Object.entries(data).map(([key, value]) => {
-                // FIX: Cast `value` from Object.entries to its specific type to avoid `unknown` type errors.
                 const navItem = value as NavItemDefinition | { path: string };
                 const currentUrlPath = navItem.path || (urlParentPath ? `${urlParentPath}/${key.toLowerCase().replace(/\s+/g, '-')}` : `/${key.toLowerCase().replace(/\s+/g, '-')}`);
                 const currentMenuKey = menuKeyParentPath ? `${menuKeyParentPath}>${key}` : key;
-                // FIX: Add checks for `navItem.children` to safely access its keys.
                 const hasChildren = 'children' in navItem && !!navItem.children && typeof navItem.children === 'object' && Object.keys(navItem.children).length > 0;
 
                 if (!hasChildren) {
                     return (
                          <li key={currentUrlPath}>
                              <NavLink to={currentUrlPath} className="sidebar-nav-item" style={({ isActive }) => styles.sidebarNavItem(level, isActive)}>
-                                 {/* FIX: Use the typed `navItem` to access properties like `icon`. */}
                                  {'icon' in navItem && navItem.icon && <span className="material-symbols-outlined">{navItem.icon}</span>}
                                  {key}
                              </NavLink>
@@ -164,33 +151,11 @@ const NavMenu: React.FC<NavMenuProps> = ({
     );
 };
 
-const filterNavForRole = (nav: NavStructure, role?: 'System Administrator' | 'Accountant'): NavStructure => {
-    // System Administrators can see all navigation items, so no filtering is needed.
-    if (role === 'System Administrator') {
-        return nav;
-    }
-
-    // For all other roles, create a deep copy to avoid mutating the original nav structure.
-    const newNav = JSON.parse(JSON.stringify(nav));
-
-    // Remove the 'Usuarios' link, which is only for administrators.
-    const configuracion = newNav['Configuración'];
-    if (configuracion && 'children' in configuracion) {
-        const general = configuracion.children['General'];
-        if (general && 'children' in general) {
-            delete general.children['Usuarios'];
-        }
-    }
-    
-    return newNav;
-};
-
-export const Sidebar = () => {
+export const Sidebar = ({ navStructure }: { navStructure: NavStructure }) => {
     const { currentUser } = useSession();
     if (!currentUser) return null;
 
-    const filteredNav = filterNavForRole(navStructure, currentUser.role);
-    const { openMenus, toggleMenu } = useMenuState(filteredNav);
+    const { openMenus, toggleMenu } = useMenuState(navStructure);
 
     return (
         <nav style={styles.sidebar}>
@@ -199,7 +164,7 @@ export const Sidebar = () => {
                 <h1 style={styles.sidebarTitle}>Contador Experto</h1>
             </div>
             <NavMenu 
-                data={filteredNav} 
+                data={navStructure} 
                 openMenus={openMenus} 
                 toggleMenu={toggleMenu} 
             />

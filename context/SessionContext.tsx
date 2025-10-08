@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../supabaseClient';
-import type { User, Company, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowance, Notification, AnyTable } from '../types';
+import type { User, Company, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowance, Notification, AnyTable, UserData } from '../types';
 
 interface Session {
     currentUser: User | null;
@@ -35,6 +35,10 @@ interface Session {
     sendPasswordResetEmail: (email: string) => Promise<void>;
     fetchDataForCompany: (companyId: number) => Promise<void>;
     refreshTable: <T extends keyof AnyTable>(tableName: T) => Promise<void>;
+    addUser: (userData: UserData, password: string, setLoadingMessage: (message: string) => void) => Promise<User>;
+    updateUser: (user: User) => Promise<void>;
+    deleteUser: (userId: string) => Promise<void>;
+    handleApiError: (error: any, context: string) => void;
 }
 
 const SessionContext = createContext<Session | undefined>(undefined);
@@ -81,13 +85,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [notifications, setNotifications] = useState<(Notification & { id: number })[]>([]);
 
-
     const addNotification = (notification: Notification) => {
         const newId = Date.now();
         setNotifications(prev => [...prev, { ...notification, id: newId }]);
         setTimeout(() => {
             setNotifications(prev => prev.filter(n => n.id !== newId));
         }, 5000);
+    };
+    
+    const handleApiError = (error: any, context: string) => {
+        const message = error.message || `Error desconocido ${context}`;
+        addNotification({ type: 'error', message });
     };
 
     const setActiveCompanyId = (id: number) => {
@@ -205,6 +213,41 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const addUser = async (userData: UserData, password: string, setLoadingMessage: (message: string) => void): Promise<User> => {
+        setLoadingMessage("Invocando función de creación de usuario...");
+        const { data, error } = await supabase.functions.invoke('create-user', {
+            body: { userData, password },
+        });
+
+        if (error) {
+            throw new Error(`Error en la función: ${error.message}`);
+        }
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        setLoadingMessage("Usuario creado, actualizando la tabla local...");
+        await refreshTable('users');
+        return data.user;
+    };
+
+    const updateUser = async (user: User) => {
+        const { error } = await supabase.functions.invoke('update-user', {
+            body: { userId: user.id, updates: user },
+        });
+        if (error) throw error;
+        await refreshTable('users');
+    };
+
+    const deleteUser = async (userId: string) => {
+        const { error } = await supabase.functions.invoke('delete-user', {
+            body: { userId },
+        });
+        if (error) throw error;
+        await refreshTable('users');
+    };
+
 
     useEffect(() => {
         const checkUser = async () => {
@@ -220,7 +263,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                         .single();
 
                     if (error) {
-                        // This is a critical error, likely RLS failing. Log out the user.
                         throw new Error(`Failed to fetch user profile: ${error.message}`);
                     } 
 
@@ -231,10 +273,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 }
             } catch (error) {
                 console.error("Error during session check:", error);
-                await supabase.auth.signOut(); // Ensure user is logged out
+                await supabase.auth.signOut();
                 setCurrentUser(null);
             } finally {
-                setIsLoading(false); // Crucial: ensure loading is always set to false
+                setIsLoading(false);
             }
         };
 
@@ -280,7 +322,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const login = async (email: string, pass: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) {
-            // Customize the error message for invalid credentials
             if (error.message.includes("Invalid login credentials")) {
                 throw new Error("El correo o la contraseña no son correctos. Por favor, inténtelo de nuevo.");
             }
@@ -322,7 +363,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             institutions, monthlyParameters, vouchers, invoices, feeInvoices, warehouseMovements,
             payslips, bankReconciliations, users, accountGroups, familyAllowances, activeCompanyId,
             activePeriod, periods, isLoading, notifications, login, logout, addNotification,
-            setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable
+            setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
+            addUser, updateUser, deleteUser, handleApiError
         }}>
             {children}
         </SessionContext.Provider>
