@@ -142,6 +142,9 @@ const LoginView = () => {
                     case 'Email not confirmed':
                         userFriendlyMessage = 'Debe confirmar su dirección de correo electrónico para poder ingresar.';
                         break;
+                    default:
+                        userFriendlyMessage = error.message;
+                        break;
                 }
             }
             addNotification({ type: 'error', message: userFriendlyMessage });
