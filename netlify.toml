@@ -1,0 +1,7 @@
+[build]
+  command = "vite build"
+  publish = "dist"
+
+[dev]
+  command = "vite"
+  port = 3000
