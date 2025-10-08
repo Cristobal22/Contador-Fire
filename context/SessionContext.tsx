@@ -186,6 +186,58 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    useEffect(() => {
+        setIsLoading(true); 
+    
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                if (session?.user) {
+                    const { data: userProfile, error } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+                    if (error) {
+                        handleApiError(error, "al cargar el perfil de usuario");
+                        setIsLoading(false);
+                        return;
+                    }
+                    if (userProfile) {
+                        setCurrentUser(userProfile);
+                        await fetchInitialData(userProfile);
+                    } else {
+                        handleApiError({ message: "No se encontró el perfil para el usuario." }, "en la carga inicial");
+                        setIsLoading(false);
+                    }
+                } else {
+                    setIsLoading(false);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                setCurrentUser(null);
+                setCompanies([]);
+                setChartOfAccounts([]);
+                setSubjects([]);
+                setCostCenters([]);
+                setItems([]);
+                setEmployees([]);
+                setInstitutions([]);
+                setMonthlyParameters([]);
+                setVouchers([]);
+                setInvoices([]);
+                setFeeInvoices([]);
+                setWarehouseMovements([]);
+                setPayslips([]);
+                setBankReconciliations([]);
+                setUsers([]);
+                setAccountGroups([]);
+                setFamilyAllowances([]);
+                setActiveCompanyIdState(null);
+                localStorage.removeItem('activeCompanyId');
+                setIsLoading(false);
+            }
+        });
+    
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, []);
+
     const switchCompany = (id: number) => {
         if (id === activeCompanyId) return;
         localStorage.setItem('activeCompanyId', id.toString());
@@ -289,60 +341,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('users');
     };
 
-    useEffect(() => {
-        const checkUser = async () => {
-            setIsLoading(true);
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                const { data: userProfile, error } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-                if (error) throw new Error(`Failed to fetch user profile: ${error.message}`);
-                if (userProfile) {
-                    setCurrentUser(userProfile);
-                    await fetchInitialData(userProfile);
-                }
-            } else {
-                setIsLoading(false);
-            }
-        };
-        checkUser();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (_event === 'SIGNED_IN' && session?.user) {
-                setIsLoading(true);
-                const { data: userProfile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-                if (userProfile) {
-                    setCurrentUser(userProfile);
-                    await fetchInitialData(userProfile);
-                }
-            } else if (_event === 'SIGNED_OUT') {
-                setCurrentUser(null);
-                setCompanies([]);
-                setChartOfAccounts([]);
-                setSubjects([]);
-                setCostCenters([]);
-                setItems([]);
-                setEmployees([]);
-                setInstitutions([]);
-                setMonthlyParameters([]);
-                setVouchers([]);
-                setInvoices([]);
-                setFeeInvoices([]);
-                setWarehouseMovements([]);
-                setPayslips([]);
-                setBankReconciliations([]);
-                setUsers([]);
-                setAccountGroups([]);
-                setFamilyAllowances([]);
-                setActiveCompanyIdState(null);
-                setIsLoading(false);
-            }
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
-
     const login = async (email: string, pass: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) {
@@ -363,8 +361,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (profileError) throw profileError;
         if (!userProfile) throw new Error('Login failed: No user profile found.');
         
-        // Ya no se llama a fetchInitialData aquí para evitar la condición de carrera.
-        // El listener onAuthStateChange se encargará de ello.
         return userProfile;
     };
 
