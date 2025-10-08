@@ -42,6 +42,12 @@ interface Session {
     addCompany: (company: Omit<Company, 'id' | 'owner_id'>) => Promise<void>;
     updateCompany: (company: Company) => Promise<void>;
     deleteCompany: (id: number) => Promise<void>;
+    addSubject: (subject: Omit<Subject, 'id' | 'company_id'>) => Promise<void>;
+    updateSubject: (subject: Subject) => Promise<void>;
+    deleteSubject: (id: number) => Promise<void>;
+    addEmployee: (employee: Omit<Employee, 'id' | 'company_id'>) => Promise<void>;
+    updateEmployee: (employee: Employee) => Promise<void>;
+    deleteEmployee: (id: number) => Promise<void>;
 }
 
 const SessionContext = createContext<Session | undefined>(undefined);
@@ -418,6 +424,85 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             handleApiError(error, 'al eliminar la empresa');
         }
     };
+    
+    const addSubject = async (subject: Omit<Subject, 'id' | 'company_id'>) => {
+        if (!activeCompany) {
+            handleApiError({ message: 'No hay una empresa activa' }, 'al agregar sujeto');
+            return;
+        }
+        try {
+            const newSubject = { ...subject, rut: unformatRut(subject.rut), company_id: activeCompany.id };
+            const { error } = await supabase.from('subjects').insert(newSubject);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Sujeto agregado correctamente.' });
+            await refreshTable('subjects');
+        } catch (error: any) {
+            handleApiError(error, 'al agregar el sujeto');
+        }
+    };
+
+    const updateSubject = async (subject: Subject) => {
+        try {
+            const subjectToUpdate = { ...subject, rut: unformatRut(subject.rut) };
+            const { error } = await supabase.from('subjects').update(subjectToUpdate).eq('id', subject.id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Sujeto actualizado correctamente.' });
+            await refreshTable('subjects');
+        } catch (error: any) {
+            handleApiError(error, 'al actualizar el sujeto');
+        }
+    };
+
+    const deleteSubject = async (id: number) => {
+        try {
+            const { error } = await supabase.from('subjects').delete().eq('id', id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Sujeto eliminado correctamente.' });
+            await refreshTable('subjects');
+        } catch (error: any) {
+            handleApiError(error, 'al eliminar el sujeto');
+        }
+    };
+
+    const addEmployee = async (employee: Omit<Employee, 'id' | 'company_id'>) => {
+        if (!activeCompany) {
+            handleApiError({ message: 'No hay una empresa activa' }, 'al agregar empleado');
+            return;
+        }
+        try {
+            const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+            const { error } = await supabase.from('employees').insert(newEmployee);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empleado agregado correctamente.' });
+            await refreshTable('employees');
+        } catch (error: any) {
+            handleApiError(error, 'al agregar el empleado');
+        }
+    };
+
+    const updateEmployee = async (employee: Employee) => {
+        try {
+            const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
+            const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empleado actualizado correctamente.' });
+            await refreshTable('employees');
+        } catch (error: any) {
+            handleApiError(error, 'al actualizar el empleado');
+        }
+    };
+
+    const deleteEmployee = async (id: number) => {
+        try {
+            const { error } = await supabase.from('employees').delete().eq('id', id);
+            if (error) throw error;
+            addNotification({ type: 'success', message: 'Empleado eliminado correctamente.' });
+            await refreshTable('employees');
+        } catch (error: any) {
+            handleApiError(error, 'al eliminar el empleado');
+        }
+    };
+
 
     return (
         <SessionContext.Provider value={{
@@ -426,7 +511,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             payslips, bankReconciliations, users, accountGroups, familyAllowances, activeCompany, activeCompanyId: activeCompany?.id || null,
             activePeriod, periods, isLoading, notifications, login, logout, addNotification,
             switchCompany, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
-            addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany
+            addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany,
+            addSubject, updateSubject, deleteSubject, addEmployee, updateEmployee, deleteEmployee
         }}>
             {children}
         </SessionContext.Provider>
