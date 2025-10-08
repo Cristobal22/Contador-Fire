@@ -26,7 +26,7 @@ type BankTx = { id: number; date: string; description: string; amount: number; }
 type LedgerTx = { id: number; date: string; description: string; amount: number; };
 
 const BankReconciliationView = () => {
-    const { accounts, vouchers, addNotification } = useSession();
+    const { chartOfAccounts, vouchers, addNotification } = useSession();
     const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
     const [bankTxs, setBankTxs] = useState<BankTx[]>([]);
     const [ledgerTxs, setLedgerTxs] = useState<LedgerTx[]>([]);
@@ -35,27 +35,23 @@ const BankReconciliationView = () => {
     const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(new Set());
     const [selectedLedgerIds, setSelectedLedgerIds] = useState<Set<number>>(new Set());
 
-    const bankAccounts = useMemo(() => accounts.filter(a => a.type === 'Activo' && a.name.toLowerCase().includes('banco')), [accounts]);
+    const bankAccounts = useMemo(() => (chartOfAccounts || []).filter(a => a.type === 'Activo' && a.name.toLowerCase().includes('banco')), [chartOfAccounts]);
 
     const handleAccountChange = (e: ChangeEvent<HTMLSelectElement>) => {
         const accountId = Number(e.target.value);
         setSelectedAccountId(accountId);
         
-        const movements = vouchers
+        const movements = (vouchers || [])
             .flatMap(v => v.entries.map(entry => ({...entry, vDate: v.date, vDesc: v.description })))
             .filter(entry => entry.accountId === accountId)
             .map((entry, index) => ({
                 id: entry.id,
                 date: entry.vDate,
                 description: entry.vDesc,
-                // FIX: Explicitly cast debit and credit to Number before performing subtraction.
-                // This prevents "The left-hand side of an arithmetic operation must be of type 'any', 'number'..." errors
-                // by ensuring both operands are numeric.
                 amount: Number(entry.debit) - Number(entry.credit),
             }));
             
         setLedgerTxs(movements);
-        // Reset reconciliation state
         setBankTxs([]);
         setReconciledBankIds(new Set());
         setReconciledLedgerIds(new Set());
@@ -71,7 +67,7 @@ const BankReconciliationView = () => {
         reader.onload = (event) => {
             const text = event.target?.result as string;
             try {
-                const lines = text.split('\n').slice(1); // Assume header row
+                const lines = text.split('\n').slice(1);
                 const transactions: BankTx[] = lines.map((line, index) => {
                     const [date, description, amountStr] = line.split(',');
                     if (!date || !description || !amountStr) return null;
