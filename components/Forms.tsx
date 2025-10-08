@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from '../context/SessionContext';
+import { formatRut } from '../utils/format';
 import type { VoucherData, VoucherEntry, InvoiceData, FeeInvoiceData, Voucher } from '../types';
 
 type FormProps = {
@@ -27,7 +28,9 @@ export const GenericForm = <T extends object>({ onSave, onCancel, initialData, f
 
         let finalValue: any = value;
 
-        if (field.type === 'number') {
+        if (name === 'rut') {
+            finalValue = formatRut(value);
+        } else if (field.type === 'number') {
             finalValue = value === '' ? null : parseFloat(value);
         } else if (field.type === 'select') {
             const firstOption = field.options?.[0];
