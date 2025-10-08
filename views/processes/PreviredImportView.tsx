@@ -2,17 +2,11 @@ import React, { useState, useMemo, ChangeEvent } from 'react';
 import { useSession } from '../../context/SessionContext';
 import { EmployeeData, ParsedPreviredRow } from '../../types';
 
+// Estilos (sin cambios)
 const styles = {
     container: { display: 'flex', flexDirection: 'column', gap: '24px' },
     panel: { padding: '2rem', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid var(--border-color)' },
-    fileInput: {
-        border: '1px solid var(--border-color)',
-        borderRadius: '4px',
-        padding: '10px',
-        fontSize: '14px',
-        width: '100%',
-        backgroundColor: '#fff'
-    },
+    fileInput: { border: '1px solid var(--border-color)', borderRadius: '4px', padding: '10px', fontSize: '14px', width: '100%', backgroundColor: '#fff' },
     tableContainer: { maxHeight: '400px', overflowY: 'auto', marginTop: '16px' },
     statusNew: { color: 'var(--success-color)' },
     statusExists: { color: 'var(--text-light-color)' },
@@ -23,28 +17,53 @@ const styles = {
     summaryValue: { fontSize: '18px', fontWeight: 500, marginTop: '4px' },
 } as const;
 
+// El encabezado esperado del archivo CSV de Previred
+const EXPECTED_HEADERS = ['RUT', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'Sueldo Imponible', 'Dias Trabajados'];
+
 const PreviredImportView = () => {
     const { employees, activePeriod, importAndProcessPreviredData, addNotification, handleApiError } = useSession();
     const [parsedRows, setParsedRows] = useState<ParsedPreviredRow[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [fileKey, setFileKey] = useState(Date.now()); // Used to reset the file input
+    const [fileKey, setFileKey] = useState(Date.now());
 
     const parsePreviredCsv = (csvText: string): ParsedPreviredRow[] => {
-        const lines = csvText.split('\n').slice(1); // Skip header
+        const lines = csvText.split('\n');
+        const headerLine = lines[0].trim();
+        const headers = headerLine.split(',').map(h => h.trim());
 
-        return lines.map((line, index): ParsedPreviredRow | null => {
+        // 1. Validación del Encabezado
+        const hasCorrectHeaders = EXPECTED_HEADERS.every((expectedHeader, index) => headers[index] === expectedHeader);
+        if (!hasCorrectHeaders) {
+            throw new Error(`El formato del archivo no corresponde. Se esperaba: ${EXPECTED_HEADERS.join(', ')}`)
+        }
+
+        const dataLines = lines.slice(1);
+
+        return dataLines.map((line, index): ParsedPreviredRow | null => {
             if (!line.trim()) return null;
 
-            const [rut, apPaterno, apMaterno, nombres, taxableIncomeStr, daysWorkedStr] = line.split(',').map(s => s.trim());
-            const originalData = { rut, apPaterno, apMaterno, nombres, taxableIncomeStr, daysWorkedStr };
+            const values = line.split(',').map(s => s.trim());
             
+            // 2. Validación del número de columnas por fila
+            if (values.length !== EXPECTED_HEADERS.length) {
+                return { originalData: { rut: values[0] || 'N/A' }, rowIndex: index, status: 'error', error: 'El número de columnas no coincide con el encabezado.' };
+            }
+            
+            const rowData = EXPECTED_HEADERS.reduce((obj, header, i) => {
+                obj[header] = values[i];
+                return obj;
+            }, {} as { [key: string]: string });
+            
+            const { RUT: rut, 'Apellido Paterno': apPaterno, 'Apellido Materno': apMaterno, Nombres: nombres, 'Sueldo Imponible': taxableIncomeStr } = rowData;
+            const originalData = { rut, apPaterno, apMaterno, nombres, taxableIncomeStr, daysWorkedStr: rowData['Dias Trabajados'] };
+
             if (!rut || !apPaterno || !nombres || !taxableIncomeStr) {
                 return { originalData, rowIndex: index, status: 'error', error: 'Faltan columnas requeridas (RUT, Apellido, Nombre, Sueldo).' };
             }
 
             const taxableIncome = parseInt(taxableIncomeStr, 10);
             if (isNaN(taxableIncome)) {
-                return { originalData, rowIndex: index, status: 'error', error: 'Sueldo Imponible inválido.' };
+                return { originalData, rowIndex: index, status: 'error', error: 'Sueldo Imponible inválido (debe ser un número).' };
             }
             
             const fullName = `${nombres} ${apPaterno} ${apMaterno}`.trim();
@@ -53,10 +72,10 @@ const PreviredImportView = () => {
                 rut,
                 name: fullName,
                 position: 'No especificado',
-                hireDate: `${activePeriod}-01`, // Default to first day of the period
-                baseSalary: taxableIncome, // Use taxable income as base salary for calculation
-                afpId: 21, // SIN AFP
-                healthId: 22, // SIN ISAPRE
+                hireDate: `${activePeriod}-01`,
+                baseSalary: taxableIncome,
+                afpId: 21,
+                healthId: 22, 
             };
 
             const existingEmployee = employees.find(e => e.rut === rut);
@@ -70,7 +89,6 @@ const PreviredImportView = () => {
 
         }).filter((row): row is ParsedPreviredRow => row !== null);
     };
-
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -86,14 +104,14 @@ const PreviredImportView = () => {
                 const parsed = parsePreviredCsv(text);
                 setParsedRows(parsed);
                 addNotification({ type: 'success', message: `Archivo procesado: ${parsed.length} registros encontrados.` });
-            } catch (err) {
-                 addNotification({ type: 'error', message: `Error al leer el archivo.` });
+            } catch (err: any) {
+                 addNotification({ type: 'error', message: err.message || 'Error al leer el archivo.' });
             }
         };
         reader.onerror = () => {
              addNotification({ type: 'error', message: `No se pudo leer el archivo.` });
         };
-        reader.readAsText(file, 'ISO-8859-1'); // Common encoding for files from Chilean systems
+        reader.readAsText(file, 'ISO-8859-1');
     };
     
     const summary = useMemo(() => {
@@ -112,9 +130,8 @@ const PreviredImportView = () => {
                 type: 'success', 
                 message: `Importación completa: ${result.employeesAdded} empleados nuevos y ${result.payslipsAdded} liquidaciones generadas.`
             });
-            // Reset state after successful import
             setParsedRows([]);
-            setFileKey(Date.now()); // This clears the file input
+            setFileKey(Date.now());
         } catch (error: any) {
             handleApiError(error, 'en la importación de Previred');
         } finally {
@@ -122,15 +139,16 @@ const PreviredImportView = () => {
         }
     };
 
+    // Renderizado (sin cambios)
     return (
-        <div style={styles.container}>
+         <div style={styles.container}>
             <div style={styles.panel}>
                 <h3 style={{ marginBottom: '1rem' }}>Importar Empleados y Remuneraciones desde Previred</h3>
                  <div className="form-group">
                     <label>Cargar archivo de nómina (.csv)</label>
                     <input type="file" key={fileKey} accept=".csv" style={styles.fileInput} onChange={handleFileChange} />
                     <small style={{ color: 'var(--text-light-color)', marginTop: '8px', display: 'block' }}>
-                        Formato esperado: RUT,Apellido Paterno,Apellido Materno,Nombres,Sueldo Imponible,Dias Trabajados
+                        Formato esperado: {EXPECTED_HEADERS.join(', ')}
                     </small>
                 </div>
             </div>
