@@ -1,0 +1,3 @@
+[functions]
+  name = "create-user"
+  path = "supabase/functions/create-user"
