@@ -5,14 +5,13 @@ import { GenericForm } from '../components/Forms';
 import type { User, UserData } from '../types';
 
 const UsersView = () => {
-    const { addNotification, currentUser, handleApiError, ...session } = useSession();
+    const { addNotification, currentUser, ...session } = useSession();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<User | (Omit<User, 'id'> & { password?: string }) | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
 
-    // Display all users, sorted by name
     const users = [...session.users].sort((a, b) => a.name.localeCompare(b.name));
 
     const formFieldsEdit = [
@@ -57,7 +56,7 @@ const UsersView = () => {
                 await session.deleteUser(id);
                 addNotification({ type: 'success', message: 'Usuario eliminado con éxito.' });
             } catch (error: any) {
-                handleApiError(error, 'al eliminar usuario');
+                addNotification({ type: 'error', message: `Error al eliminar usuario: ${error.message}` });
             }
         }
     };
@@ -83,7 +82,11 @@ const UsersView = () => {
             setIsModalOpen(false);
             setEditingItem(null);
         } catch (error: any) {
-            handleApiError(error, 'al guardar usuario');
+            if (error.message && error.message.includes("User with this email address already exists")) {
+                addNotification({ type: 'error', message: 'Ya existe un usuario con este correo electrónico.' });
+            } else {
+                addNotification({ type: 'error', message: `Error al guardar usuario: ${error.message}` });
+            }
         } finally {
             setIsLoading(false);
             setLoadingMessage('');
