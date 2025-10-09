@@ -120,6 +120,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const handleApiError = (error: any, context: string) => {
         const message = error.message || `Error desconocido ${context}`;
         addNotification({ type: 'error', message });
+        console.error(`Error context: ${context}`, error);
     };
 
     const clearAllData = () => {
@@ -426,6 +427,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const addEmployee = async (employee:any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+        console.log('Adding Employee:', newEmployee);
         if (newEmployee.afpld) {
             newEmployee.afpId = newEmployee.afpld;
             delete newEmployee.afpld;
@@ -437,6 +439,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     
     const updateEmployee = async (employee:any) => {
         const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
+        console.log('Updating Employee:', employeeToUpdate);
         if (employeeToUpdate.afpld) {
             employeeToUpdate.afpId = employeeToUpdate.afpld;
             delete employeeToUpdate.afpld;
