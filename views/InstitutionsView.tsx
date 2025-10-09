@@ -7,20 +7,28 @@ const InstitutionsView = () => {
     const session = useSession();
     return (
         <CrudView<Institution>
-            title="Institución"
+            title="Instituciones"
             columns={[
+                { key: 'code', header: 'Código' },
                 { key: 'name', header: 'Nombre' },
                 { key: 'type', header: 'Tipo' },
-                { key: 'rate', header: 'Tasa (%)', render: (value) => value != null ? value : 'N/A' },
+                { key: 'cotizacion_obligatoria', header: 'Tasa (%)', render: (v) => v == null ? 'N/A' : v },
+                { key: 'codigo_previred', header: 'Código Previred' },
+                { key: 'codigo_direccion_del_trabajo', header: 'Código DT' },
+                { key: 'regimen_previsional', header: 'Régimen Previsional', render: (v) => v == null ? 'N/A' : v },
             ]}
             data={session.institutions}
             onSave={session.addInstitution}
             onUpdate={session.updateInstitution}
             onDelete={session.deleteInstitution}
             formFields={[
+                { name: 'code', label: 'Código', type: 'text' },
                 { name: 'name', label: 'Nombre', type: 'text' },
-                { name: 'type', label: 'Tipo', type: 'select', options: ['AFP', 'Isapre', 'Fonasa', 'Otro'] },
-                { name: 'rate', label: 'Tasa (sólo para AFP, ej: 1.44)', type: 'number' }
+                { name: 'type', label: 'Tipo', type: 'select', options: ['afp', 'isapre', 'fonasa', 'otro'] },
+                { name: 'cotizacion_obligatoria', label: 'Tasa (%)', type: 'number' },
+                { name: 'codigo_previred', label: 'Código Previred', type: 'text' },
+                { name: 'codigo_direccion_del_trabajo', label: 'Código DT', type: 'text' },
+                { name: 'regimen_previsional', label: 'Régimen Previsional', type: 'text' },
             ]}
         />
     );

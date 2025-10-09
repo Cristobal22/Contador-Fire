@@ -57,6 +57,9 @@ interface SessionContextType {
     addEmployee: (employee: Omit<Employee, 'id' | 'company_id'>) => Promise<void>;
     updateEmployee: (employee: Employee) => Promise<void>;
     deleteEmployee: (id: number | string) => Promise<void>;
+    addInstitution: (institution: Omit<Institution, 'id'>) => Promise<void>;
+    updateInstitution: (institution: Institution) => Promise<void>;
+    deleteInstitution: (id: number | string) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -150,7 +153,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         try {
             const companySpecificTables: (keyof AnyTable)[] = [
                 'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
-                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+                'monthly_parameters', 'vouchers', 'invoices',
                 'fee_invoices', 'warehouse_movements', 'payslips',
                 'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
             ];
@@ -170,7 +173,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             setCostCenters(companyData.cost_centers || []);
             setItems(companyData.items || []);
             setEmployees(companyData.employees || []);
-            setInstitutions(companyData.institutions || []);
             setMonthlyParameters(companyData.monthly_parameters || []);
             setVouchers(companyData.vouchers || []);
             setInvoices(companyData.invoices || []);
@@ -193,6 +195,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*');
             if (companiesError) throw companiesError;
             setCompanies(companiesData || []);
+
+            const { data: institutionsData, error: institutionsError } = await supabase.from('institutions').select('*');
+            if (institutionsError) throw institutionsError;
+            setInstitutions(institutionsData || []);
 
             if (user.role === 'System Administrator') {
                 const { data: usersData, error: usersError } = await supabase.from('users').select('*');
@@ -267,12 +273,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
-        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users') return;
+        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users' && tableName !== 'institutions') return;
         try {
             let query = supabase.from(tableName).select('*');
             const companySpecificTables: (keyof AnyTable)[] = [
                 'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
-                'institutions', 'monthly_parameters', 'vouchers', 'invoices',
+                'monthly_parameters', 'vouchers', 'invoices',
                 'fee_invoices', 'warehouse_movements', 'payslips',
                 'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
             ];
@@ -330,7 +336,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/update-password' });
         if (error) throw error;
     };
-    const addUser = async (userData, password, setLoadingMessage) => {
+    const addUser = async (userData:any, password:any, setLoadingMessage:any) => {
         setLoadingMessage("Invocando función...");
         const { data, error } = await supabase.functions.invoke('create-user', { body: { userData, password } });
         if (error || data.error) throw new Error(error?.message || data.error);
@@ -338,12 +344,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('users');
         return data.user;
     };
-    const updateUser = async (user) => {
+    const updateUser = async (user:any) => {
         const { error } = await supabase.functions.invoke('update-user', { body: { userId: user.id, updates: user } });
         if (error) throw error;
         await refreshTable('users');
     };
-    const deleteUser = async (userId) => {
+    const deleteUser = async (userId:any) => {
         const { error } = await supabase.functions.invoke('delete-user', { body: { userId } });
         if (error) throw error;
         await refreshTable('users');
@@ -374,7 +380,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Chart of Account Management
-    const addChartOfAccount = async (account) => {
+    const addChartOfAccount = async (account:any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         const newAccount = { ...account, company_id: activeCompany.id };
         const { error } = await supabase.from('chart_of_accounts').insert(newAccount);
@@ -382,20 +388,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('chart_of_accounts');
     };
 
-    const updateChartOfAccount = async (account) => {
+    const updateChartOfAccount = async (account:any) => {
         const { error } = await supabase.from('chart_of_accounts').update(account).eq('id', account.id);
         if (error) throw error;
         await refreshTable('chart_of_accounts');
     };
 
-    const deleteChartOfAccount = async (id) => {
+    const deleteChartOfAccount = async (id:any) => {
         const { error } = await supabase.from('chart_of_accounts').delete().eq('id', id);
         if (error) throw error;
         await refreshTable('chart_of_accounts');
     };
     
     // Subject Management
-    const addSubject = async (subject) => {
+    const addSubject = async (subject:any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         const newSubject = { ...subject, rut: unformatRut(subject.rut), company_id: activeCompany.id };
         const { error } = await supabase.from('subjects').insert(newSubject);
@@ -403,21 +409,21 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('subjects');
     };
     
-    const updateSubject = async (subject) => {
+    const updateSubject = async (subject:any) => {
         const subjectToUpdate = { ...subject, rut: unformatRut(subject.rut) };
         const { error } = await supabase.from('subjects').update(subjectToUpdate).eq('id', subject.id);
         if (error) throw error;
         await refreshTable('subjects');
     };
     
-    const deleteSubject = async (id) => {
+    const deleteSubject = async (id:any) => {
         const { error } = await supabase.from('subjects').delete().eq('id', id);
         if (error) throw error;
         await refreshTable('subjects');
     };
     
     // Employee Management
-    const addEmployee = async (employee) => {
+    const addEmployee = async (employee:any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
         const { error } = await supabase.from('employees').insert(newEmployee);
@@ -425,17 +431,36 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('employees');
     };
     
-    const updateEmployee = async (employee) => {
+    const updateEmployee = async (employee:any) => {
         const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
         const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
         if (error) throw error;
         await refreshTable('employees');
     };
     
-    const deleteEmployee = async (id) => {
+    const deleteEmployee = async (id:any) => {
         const { error } = await supabase.from('employees').delete().eq('id', id);
         if (error) throw error;
         await refreshTable('employees');
+    };
+
+    // Institution Management
+    const addInstitution = async (institution: Omit<Institution, 'id'>) => {
+        const { error } = await supabase.from('institutions').insert(institution);
+        if (error) throw error;
+        await refreshTable('institutions');
+    };
+
+    const updateInstitution = async (institution: Institution) => {
+        const { error } = await supabase.from('institutions').update(institution).eq('id', institution.id);
+        if (error) throw error;
+        await refreshTable('institutions');
+    };
+
+    const deleteInstitution = async (id: number | string) => {
+        const { error } = await supabase.from('institutions').delete().eq('id', id);
+        if (error) throw error;
+        await refreshTable('institutions');
     };
 
     return (
@@ -447,7 +472,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
             addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany,
             addChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
-            addSubject, updateSubject, deleteSubject, addEmployee, updateEmployee, deleteEmployee
+            addSubject, updateSubject, deleteSubject, addEmployee, updateEmployee, deleteEmployee,
+            addInstitution, updateInstitution, deleteInstitution
         }}>
             {children}
         </SessionContext.Provider>
