@@ -23,7 +23,6 @@ const CompaniesView = () => {
                 { key: 'rut', header: 'RUT', render: (rut) => formatRut(rut) },
                 { key: 'name', header: 'Razón Social' },
                 { key: 'address', header: 'Dirección' },
-                { key: 'year', header: 'Año de Inicio' },
                 {
                     key: 'actions',
                     header: 'Configurar',
@@ -45,7 +44,6 @@ const CompaniesView = () => {
                 { name: 'rut', label: 'RUT', type: 'text', required: true },
                 { name: 'name', label: 'Razón Social', type: 'text', required: true },
                 { name: 'address', label: 'Dirección', type: 'text' },
-                { name: 'year', label: 'Año de Inicio', type: 'number', required: true },
             ]}
         />
     );
