@@ -426,6 +426,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const addEmployee = async (employee:any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+        if (newEmployee.afpld) {
+            newEmployee.afpId = newEmployee.afpld;
+            delete newEmployee.afpld;
+        }
         const { error } = await supabase.from('employees').insert(newEmployee);
         if (error) throw error;
         await refreshTable('employees');
@@ -433,6 +437,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     
     const updateEmployee = async (employee:any) => {
         const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
+        if (employeeToUpdate.afpld) {
+            employeeToUpdate.afpId = employeeToUpdate.afpld;
+            delete employeeToUpdate.afpld;
+        }
         const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
         if (error) throw error;
         await refreshTable('employees');
