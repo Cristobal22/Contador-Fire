@@ -57,7 +57,7 @@ const GeneralLedgerView = () => {
     const accountMovements = useMemo(() => {
         if (!selectedAccountId) return null;
 
-        const allEntries = vouchers
+        const allEntries = (vouchers || [])
             .flatMap(v => v.entries.map(e => ({ ...e, date: v.date, description: v.description, voucherId: v.id })))
             .filter(e => e.accountId === selectedAccountId)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -89,7 +89,7 @@ const GeneralLedgerView = () => {
                     style={{ width: '400px', padding: '8px' }}
                 >
                     <option value="">-- Seleccione una cuenta --</option>
-                    {accounts.sort((a,b) => a.code.localeCompare(b.code)).map(acc => (
+                    {(accounts || []).sort((a,b) => a.code.localeCompare(b.code)).map(acc => (
                         <option key={acc.id} value={acc.id}>
                             {acc.code} - {acc.name}
                         </option>
