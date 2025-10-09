@@ -4,7 +4,7 @@ import { CrudView } from '../components/CrudView';
 import type { ChartOfAccount } from '../types';
 import Papa from 'papaparse'; // Library to parse CSV files
 
-const styles = {
+const styles: { [key: string]: React.CSSProperties } = {
     container: {
         padding: '2rem',
     },
@@ -41,6 +41,12 @@ const styles = {
         color: 'var(--text-light-color)',
         marginTop: '8px',
         display: 'block'
+    },
+    warningText: {
+        color: '#f39c12', // A mild orange for warnings
+        fontWeight: 'bold',
+        display: 'block',
+        marginTop: '8px',
     }
 };
 
@@ -68,9 +74,75 @@ const ChartOfAccountsView = () => {
         document.body.removeChild(link);
     };
 
+    const handleLoadDefaultChartOfAccounts = () => {
+        if (!window.confirm('¿Estás seguro de que quieres reemplazar tu plan de cuentas actual con el predeterminado? Se borrarán todas las cuentas existentes.')) {
+            return;
+        }
+
+        fetch('/plan_de_cuentas_predeterminado.csv')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(csvText => {
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: async (results) => {
+                        const accountsToImport = results.data as any[];
+
+                        if (!accountsToImport.length) {
+                            alert('El archivo de plan de cuentas predeterminado está vacío o no se pudo leer.');
+                            return;
+                        }
+
+                        try {
+                            // Delete all existing accounts for the current company
+                            if (session.accounts && session.accounts.length > 0) {
+                                for (const acc of session.accounts) {
+                                    await session.deleteAccount(acc.id);
+                                }
+                            }
+                            
+                            // Add new accounts
+                            for (const acc of accountsToImport) {
+                                if (acc.code && acc.name && acc.type) { // Basic validation
+                                    const newAccount: Omit<ChartOfAccount, 'id'> = {
+                                        code: acc.code,
+                                        name: acc.name,
+                                        type: acc.type,
+                                        companyId: session.company?.id || 0,
+                                    };
+                                    await session.addAccount(newAccount);
+                                }
+                            }
+                            alert('¡Plan de cuentas predeterminado cargado con éxito!');
+                        } catch (error) {
+                            console.error("Error al cargar el plan de cuentas predeterminado:", error);
+                            alert('Hubo un error al cargar el plan de cuentas. Revise la consola para más detalles.');
+                        }
+                    },
+                    error: (error: any) => {
+                        alert('Ocurrió un error al procesar el archivo CSV predeterminado.');
+                        console.error("CSV Parsing Error:", error);
+                    }
+                });
+            })
+            .catch(error => {
+                alert('No se pudo encontrar o cargar el archivo del plan de cuentas predeterminado (plan_de_cuentas_predeterminado.csv).');
+                console.error("Fetch error:", error);
+            });
+    };
+
     const handleImport = () => {
         if (!file) {
             alert('Por favor, seleccione un archivo primero.');
+            return;
+        }
+        
+        if (!window.confirm('¿Estás seguro de que quieres importar este archivo? Se reemplazarán todas las cuentas existentes.')) {
             return;
         }
 
@@ -86,7 +158,14 @@ const ChartOfAccountsView = () => {
                 }
                 
                 try {
-                    // We can implement a bulk add in the future. For now, we add one by one.
+                     // Delete all existing accounts for the current company
+                     if (session.accounts && session.accounts.length > 0) {
+                        for (const acc of session.accounts) {
+                            await session.deleteAccount(acc.id);
+                        }
+                    }
+
+                    // Add new accounts
                     for (const acc of accountsToImport) {
                         const newAccount: Omit<ChartOfAccount, 'id'> = {
                             code: acc.code,
@@ -115,9 +194,21 @@ const ChartOfAccountsView = () => {
     return (
         <div style={styles.container}>
             <div style={styles.importPanel}>
-                <h3 style={styles.panelTitle}>Importar Plan de Cuentas</h3>
+                <h3 style={styles.panelTitle}>Cargar Plan de Cuentas Predeterminado</h3>
                 <p>
-                    Puedes cargar masivamente tu plan de cuentas usando un archivo CSV.
+                    Puedes cargar un plan de cuentas estándar basado en las mejores prácticas contables.
+                </p>
+                <small style={styles.warningText}>
+                    Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
+                </small>
+                <br />
+                <button style={styles.button} onClick={handleLoadDefaultChartOfAccounts}>Cargar Plan Predeterminado</button>
+            </div>
+
+            <div style={styles.importPanel}>
+                <h3 style={styles.panelTitle}>Importar Plan de Cuentas Personalizado</h3>
+                <p>
+                    O puedes cargar masivamente tu plan de cuentas usando un archivo CSV.
                     <span onClick={handleDownloadTemplate} style={styles.textLink}> Descargar plantilla</span>.
                 </p>
                 <div style={styles.formGroup}>
@@ -125,6 +216,9 @@ const ChartOfAccountsView = () => {
                     <input type="file" key={fileKey} accept=".csv" style={styles.fileInput} onChange={handleFileChange} />
                     <small style={styles.smallText}>
                         Formato esperado: {CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.join(', ')}
+                    </small>
+                    <small style={styles.warningText}>
+                        Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
                     </small>
                 </div>
                 <button style={styles.button} onClick={handleImport} disabled={!file}>Importar Cuentas</button>
