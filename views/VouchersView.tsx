@@ -7,7 +7,7 @@ import type { Voucher, VoucherData } from '../types';
 const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: {id: number, name: string, code: string}[] }> = ({ voucher, onClose, accounts }) => {
     if (!voucher) return null;
     
-    const getAccountName = (id: number | '') => accounts.find(a => a.id === id)?.name || 'N/A';
+    const getAccountName = (id: number | '') => (accounts || []).find(a => a.id === id)?.name || 'N/A';
     const totalDebit = voucher.entries.reduce((sum, e) => sum + e.debit, 0);
 
     return (
@@ -116,7 +116,7 @@ const VouchersView: React.FC = () => {
                     <tr><th>Fecha</th><th>Glosa</th><th>N° Asientos</th><th>Acciones</th></tr>
                 </thead>
                 <tbody>
-                    {vouchers.length > 0 ? vouchers.map(v => (
+                    {(vouchers && vouchers.length > 0) ? vouchers.map(v => (
                         <tr key={v.id}>
                             <td>{v.date}</td>
                             <td>{v.description}</td>
