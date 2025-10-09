@@ -21,7 +21,7 @@ const BalancesView = () => {
         const accountTotals = new Map<number, { debit: number; credit: number }>();
 
         (vouchers || []).forEach(voucher => {
-            voucher.entries.forEach(entry => {
+            (voucher.entries || []).forEach(entry => {
                 const accountId = entry.accountId;
                 if (accountId === '') return;
 
