@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { GenericForm } from '../components/Forms';
 
 const WarehouseMovementsView: React.FC<{ type: 'Entrada' | 'Salida' }> = ({ type }) => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { InvoiceForm } from '../components/Forms';
 import type { InvoiceData } from '../types';
 

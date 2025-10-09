@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal } from './Modal';
+import Modal from './Modal';
 import { GenericForm } from './Forms';
 import { useSession } from '../context/SessionContext';
 import { validateRut } from '../utils/format';

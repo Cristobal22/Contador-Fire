@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { GenericForm } from '../components/Forms';
 import { PayslipData, Payslip } from '../types';
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
-import { Modal } from '../components/Modal';
+import Modal from '../components/Modal';
 import { VoucherForm } from '../components/Forms';
 import type { Voucher, VoucherData } from '../types';
 
