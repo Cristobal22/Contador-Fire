@@ -46,6 +46,10 @@ interface SessionContextType {
     addCompany: (company: CompanyData) => Promise<void>;
     updateCompany: (id: number, data: Partial<Company>) => Promise<void>;
     deleteCompany: (id: number | string) => Promise<void>;
+    // Chart of Account Management
+    addChartOfAccount: (account: Omit<ChartOfAccount, 'id' | 'company_id'>) => Promise<void>;
+    updateChartOfAccount: (account: ChartOfAccount) => Promise<void>;
+    deleteChartOfAccount: (id: number | string) => Promise<void>;
     // Other specific data actions
     addSubject: (subject: Omit<Subject, 'id' | 'company_id'>) => Promise<void>;
     updateSubject: (subject: Subject) => Promise<void>;
@@ -368,6 +372,27 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (error) throw error;
         setCompanies(prev => prev.filter(c => c.id !== id));
     };
+
+    // Chart of Account Management
+    const addChartOfAccount = async (account) => {
+        if (!activeCompany) throw new Error('No hay una empresa activa');
+        const newAccount = { ...account, company_id: activeCompany.id };
+        const { error } = await supabase.from('chart_of_accounts').insert(newAccount);
+        if (error) throw error;
+        await refreshTable('chart_of_accounts');
+    };
+
+    const updateChartOfAccount = async (account) => {
+        const { error } = await supabase.from('chart_of_accounts').update(account).eq('id', account.id);
+        if (error) throw error;
+        await refreshTable('chart_of_accounts');
+    };
+
+    const deleteChartOfAccount = async (id) => {
+        const { error } = await supabase.from('chart_of_accounts').delete().eq('id', id);
+        if (error) throw error;
+        await refreshTable('chart_of_accounts');
+    };
     
     // Subject Management
     const addSubject = async (subject) => {
@@ -421,6 +446,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             activeCompanyId, activePeriod, periods, isLoading, notifications, login, logout, addNotification,
             setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
             addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany,
+            addChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
             addSubject, updateSubject, deleteSubject, addEmployee, updateEmployee, deleteEmployee
         }}>
             {children}

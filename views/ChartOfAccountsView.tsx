@@ -100,22 +100,21 @@ const ChartOfAccountsView = () => {
 
                         try {
                             // Delete all existing accounts for the current company
-                            if (session.accounts && session.accounts.length > 0) {
-                                for (const acc of session.accounts) {
-                                    await session.deleteAccount(acc.id);
+                            if (session.chartOfAccounts && session.chartOfAccounts.length > 0) {
+                                for (const acc of session.chartOfAccounts) {
+                                    await session.deleteChartOfAccount(acc.id);
                                 }
                             }
                             
                             // Add new accounts
                             for (const acc of accountsToImport) {
                                 if (acc.code && acc.name && acc.type) { // Basic validation
-                                    const newAccount: Omit<ChartOfAccount, 'id'> = {
+                                    const newAccount: Omit<ChartOfAccount, 'id' | 'company_id'> = {
                                         code: acc.code,
                                         name: acc.name,
                                         type: acc.type,
-                                        companyId: session.company?.id || 0,
                                     };
-                                    await session.addAccount(newAccount);
+                                    await session.addChartOfAccount(newAccount);
                                 }
                             }
                             alert('¡Plan de cuentas predeterminado cargado con éxito!');
@@ -159,21 +158,20 @@ const ChartOfAccountsView = () => {
                 
                 try {
                      // Delete all existing accounts for the current company
-                     if (session.accounts && session.accounts.length > 0) {
-                        for (const acc of session.accounts) {
-                            await session.deleteAccount(acc.id);
+                     if (session.chartOfAccounts && session.chartOfAccounts.length > 0) {
+                        for (const acc of session.chartOfAccounts) {
+                            await session.deleteChartOfAccount(acc.id);
                         }
                     }
 
                     // Add new accounts
                     for (const acc of accountsToImport) {
-                        const newAccount: Omit<ChartOfAccount, 'id'> = {
+                        const newAccount: Omit<ChartOfAccount, 'id' | 'company_id'> = {
                             code: acc.code,
                             name: acc.name,
                             type: acc.type,
-                            companyId: session.company?.id || 0, 
                         };
-                        await session.addAccount(newAccount);
+                        await session.addChartOfAccount(newAccount);
                     }
                     alert('¡Cuentas importadas con éxito!');
                 } catch (error) {
@@ -231,10 +229,10 @@ const ChartOfAccountsView = () => {
                     { key: 'name', header: 'Nombre' },
                     { key: 'type', header: 'Tipo' }
                 ]}
-                data={session.accounts || []}
-                onSave={session.addAccount}
-                onUpdate={session.updateAccount}
-                onDelete={session.deleteAccount}
+                data={session.chartOfAccounts || []}
+                onSave={(acc) => session.addChartOfAccount(acc as Omit<ChartOfAccount, 'id' | 'company_id'>)}
+                onUpdate={session.updateChartOfAccount}
+                onDelete={session.deleteChartOfAccount}
                 formFields={[
                     { name: 'code', label: 'Código', type: 'text' },
                     { name: 'name', label: 'Nombre', type: 'text' },
