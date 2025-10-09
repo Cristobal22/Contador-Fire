@@ -2,8 +2,51 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { unformatRut } from '../utils/format';
-// Import CompanyData and allow Partial for updates
 import type { User, Company, CompanyData, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowanceBracket, Notification, AnyTable, UserData, IncomeTaxBracket } from '../types';
+
+// --- Funciones de Ayuda para Conversión de Nombres ---
+const toCamel = (s: string): string => {
+  return s.replace(/([-_][a-z])/ig, ($1) => {
+    return $1.toUpperCase()
+      .replace('-', '')
+      .replace('_', '');
+  });
+};
+
+const toSnake = (s: string): string => {
+  return s.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+const convertKeysToCamel = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(v => convertKeysToCamel(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce((result, key) => {
+      result[toCamel(key)] = convertKeysToCamel(obj[key]);
+      return result;
+    }, {} as any);
+  }
+  return obj;
+};
+
+const convertKeysToSnake = (obj: any): any => {
+    if (Array.isArray(obj)) {
+        return obj.map(v => convertKeysToSnake(v));
+    } else if (obj !== null && obj.constructor === Object) {
+        return Object.keys(obj).reduce((result, key) => {
+            // Excepciones conocidas que no deben convertirse
+            if (key === 'rut' || key === 'name' || key === 'position' || key === 'id' || key === 'company_id' || key === 'owner_id') {
+                 result[key] = convertKeysToSnake(obj[key]);
+            } else {
+                 result[toSnake(key)] = convertKeysToSnake(obj[key]);
+            }
+            return result;
+        }, {} as any);
+    }
+    return obj;
+};
+// ----------------------------------------------------
+
 
 interface SessionContextType {
     currentUser: User | null;
@@ -42,15 +85,12 @@ interface SessionContextType {
     updateUser: (user: User) => Promise<void>;
     deleteUser: (userId: string) => Promise<void>;
     handleApiError: (error: any, context: string) => void;
-    // Updated signatures for company management
     addCompany: (company: CompanyData) => Promise<void>;
     updateCompany: (id: number, data: Partial<Company>) => Promise<void>;
     deleteCompany: (id: number | string) => Promise<void>;
-    // Chart of Account Management
     addChartOfAccount: (account: Omit<ChartOfAccount, 'id' | 'company_id'>) => Promise<void>;
     updateChartOfAccount: (account: ChartOfAccount) => Promise<void>;
     deleteChartOfAccount: (id: number | string) => Promise<void>;
-    // Other specific data actions
     addSubject: (subject: Omit<Subject, 'id' | 'company_id'>) => Promise<void>;
     updateSubject: (subject: Subject) => Promise<void>;
     deleteSubject: (id: number | string) => Promise<void>;
@@ -122,6 +162,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         addNotification({ type: 'error', message });
         console.error(`Error context: ${context}`, error);
     };
+    
+    // Generic fetch and set state function with key conversion
+    const fetchAndSetData = async (tableName: keyof AnyTable, setter: React.Dispatch<React.SetStateAction<any>>, companyId?: number) => {
+        try {
+            let query = supabase.from(tableName).select('*');
+            if (companyId) {
+                query = query.eq('company_id', companyId);
+            }
+            const { data, error } = await query;
+            if (error) throw error;
+            
+            // Convert snake_case from DB to camelCase for UI
+            const camelCaseData = convertKeysToCamel(data);
+            setter(camelCaseData || []);
+        } catch (error: any) {
+            handleApiError(error, `al cargar ${tableName}`);
+        }
+    };
+
 
     const clearAllData = () => {
         setCurrentUser(null);
@@ -146,66 +205,45 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('activeCompanyId');
         localStorage.removeItem('activePeriod');
     };
-
     const fetchDataForCompany = async (companyId: number) => {
         if (!companyId) return;
         addNotification({ type: 'success', message: `Sincronizando datos para la empresa...` });
 
-        try {
-            const companySpecificTables: (keyof AnyTable)[] = [
-                'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
-                'monthly_parameters', 'vouchers', 'invoices',
-                'fee_invoices', 'warehouse_movements', 'payslips',
-                'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
-            ];
+        // Using the new fetchAndSetData function
+        await Promise.all([
+            fetchAndSetData('chart_of_accounts', setChartOfAccounts, companyId),
+            fetchAndSetData('subjects', setSubjects, companyId),
+            fetchAndSetData('cost_centers', setCostCenters, companyId),
+            fetchAndSetData('items', setItems, companyId),
+            fetchAndSetData('employees', setEmployees, companyId),
+            fetchAndSetData('monthly_parameters', setMonthlyParameters, companyId),
+            fetchAndSetData('vouchers', setVouchers, companyId),
+            fetchAndSetData('invoices', setInvoices, companyId),
+            fetchAndSetData('fee_invoices', setFeeInvoices, companyId),
+            fetchAndSetData('warehouse_movements', setWarehouseMovements, companyId),
+            fetchAndSetData('payslips', setPayslips, companyId),
+            fetchAndSetData('account_groups', setAccountGroups, companyId),
+            fetchAndSetData('family_allowance_brackets', setFamilyAllowanceBrackets, companyId),
+            fetchAndSetData('income_tax_brackets', setIncomeTaxBrackets, companyId)
+        ]);
 
-            const promises = companySpecificTables.map(tableName =>
-                supabase.from(tableName).select('*').eq('company_id', companyId).then(({ data, error }) => {
-                    if (error) throw new Error(`Error fetching ${tableName}: ${error.message}`);
-                    return { [tableName]: data || [] };
-                })
-            );
-
-            const results = await Promise.all(promises);
-            const companyData: { [key: string]: any[] } = results.reduce((acc, current) => ({ ...acc, ...current }), {});
-
-            setChartOfAccounts(companyData.chart_of_accounts || []);
-            setSubjects(companyData.subjects || []);
-            setCostCenters(companyData.cost_centers || []);
-            setItems(companyData.items || []);
-            setEmployees(companyData.employees || []);
-            setMonthlyParameters(companyData.monthly_parameters || []);
-            setVouchers(companyData.vouchers || []);
-            setInvoices(companyData.invoices || []);
-            setFeeInvoices(companyData.fee_invoices || []);
-            setWarehouseMovements(companyData.warehouse_movements || []);
-            setPayslips(companyData.payslips || []);
-            setAccountGroups(companyData.account_groups || []);
-            setFamilyAllowanceBrackets(companyData.family_allowance_brackets || []);
-            setIncomeTaxBrackets(companyData.income_tax_brackets || []);
-
-            addNotification({ type: 'success', message: 'Datos sincronizados correctamente.' });
-        } catch (error: any) {
-            handleApiError(error, 'al sincronizar los datos de la empresa');
-        }
+        addNotification({ type: 'success', message: 'Datos sincronizados correctamente.' });
     };
+
     
     const fetchInitialData = async (user: User) => {
         setIsLoading(true);
         try {
-            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*');
-            if (companiesError) throw companiesError;
-            setCompanies(companiesData || []);
-
-            const { data: institutionsData, error: institutionsError } = await supabase.from('institutions').select('*');
-            if (institutionsError) throw institutionsError;
-            setInstitutions(institutionsData || []);
+            await fetchAndSetData('companies', setCompanies);
+            await fetchAndSetData('institutions', setInstitutions);
 
             if (user.role === 'System Administrator') {
-                const { data: usersData, error: usersError } = await supabase.from('users').select('*');
-                if (usersError) throw usersError;
-                setUsers(usersData || []);
+                await fetchAndSetData('users', setUsers);
             }
+
+            // The rest of the logic remains mostly the same, but we need to work with the state that is already set
+            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('id, owner_id');
+            if(companiesError) throw companiesError;
 
             const userHasCompanies = (companiesData || []).some(c => c.owner_id === user.id);
             let companyToLoad: number | null = null;
@@ -272,50 +310,41 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('activePeriod', period);
         setActivePeriodState(period);
     };
-
+    
     const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
-        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users' && tableName !== 'institutions') return;
-        try {
-            let query = supabase.from(tableName).select('*');
-            const companySpecificTables: (keyof AnyTable)[] = [
+        const setters: { [K in keyof AnyTable]?: React.Dispatch<React.SetStateAction<any>> } = {
+            companies: setCompanies,
+            chart_of_accounts: setChartOfAccounts,
+            subjects: setSubjects,
+            cost_centers: setCostCenters,
+            items: setItems,
+            employees: setEmployees,
+            institutions: setInstitutions,
+            monthly_parameters: setMonthlyParameters,
+            vouchers: setVouchers,
+            invoices: setInvoices,
+            fee_invoices: setFeeInvoices,
+            warehouse_movements: setWarehouseMovements,
+            payslips: setPayslips,
+            users: setUsers,
+            account_groups: setAccountGroups,
+            family_allowance_brackets: setFamilyAllowanceBrackets,
+            income_tax_brackets: setIncomeTaxBrackets,
+        };
+
+        const setter = setters[tableName];
+        if (setter) {
+             const companySpecificTables: (keyof AnyTable)[] = [
                 'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
                 'monthly_parameters', 'vouchers', 'invoices',
                 'fee_invoices', 'warehouse_movements', 'payslips',
                 'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
             ];
-            if (activeCompanyId && companySpecificTables.includes(tableName)) {
-                query = query.eq('company_id', activeCompanyId);
-            }
-    
-            const { data, error } = await query;
-            if (error) throw error;
-
-            const setters: { [K in keyof AnyTable]: React.Dispatch<React.SetStateAction<any>> } = {
-                companies: setCompanies,
-                chart_of_accounts: setChartOfAccounts,
-                subjects: setSubjects,
-                cost_centers: setCostCenters,
-                items: setItems,
-                employees: setEmployees,
-                institutions: setInstitutions,
-                monthly_parameters: setMonthlyParameters,
-                vouchers: setVouchers,
-                invoices: setInvoices,
-                fee_invoices: setFeeInvoices,
-                warehouse_movements: setWarehouseMovements,
-                payslips: setPayslips,
-                users: setUsers,
-                account_groups: setAccountGroups,
-                family_allowance_brackets: setFamilyAllowanceBrackets,
-                income_tax_brackets: setIncomeTaxBrackets,
-            };
-    
-            if (setters[tableName]) setters[tableName](data || []);
-
-        } catch (error: any) {
-            handleApiError(error, `al refrescar la tabla ${tableName}`);
+            const needsCompanyId = companySpecificTables.includes(tableName);
+            await fetchAndSetData(tableName, setter, needsCompanyId ? activeCompanyId : undefined);
         }
     };
+
 
     // Auth and User Management
     const login = async (email: string, pass: string) => {
@@ -356,7 +385,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('users');
     };
 
-    // Company Management (Updated)
+    // Company Management
     const addCompany = async (company: CompanyData) => {
         if (!currentUser) throw new Error('Usuario no autenticado');
         const newCompany = { ...company, rut: unformatRut(company.rut), owner_id: currentUser.id };
@@ -423,32 +452,52 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await refreshTable('subjects');
     };
     
-    // Employee Management
+    // --- Employee Management con Conversión ---
     const addEmployee = async (employee: any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         
-        const employeeToSave = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+        // Convert camelCase from UI to snake_case for DB
+        const employeeToSave = convertKeysToSnake({ 
+            ...employee, 
+            rut: unformatRut(employee.rut), 
+            company_id: activeCompany.id 
+        });
 
-        console.log('Attempting to save employee:', employeeToSave);
+        console.log('Attempting to save employee (snake_case):', employeeToSave);
 
         const { error } = await supabase.from('employees').insert(employeeToSave);
-        if (error) throw error;
+        if (error) {
+            handleApiError(error, 'al guardar empleado');
+            throw error;
+        }
         await refreshTable('employees');
     };
 
     const updateEmployee = async (employee: any) => {
-        const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
+         if (!activeCompany) throw new Error('No hay una empresa activa');
 
-        console.log('Attempting to update employee:', employeeToUpdate);
+        // Convert camelCase from UI to snake_case for DB
+        const employeeToUpdate = convertKeysToSnake({
+             ...employee, 
+             rut: unformatRut(employee.rut)
+        });
+
+        console.log('Attempting to update employee (snake_case):', employeeToUpdate);
 
         const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
-        if (error) throw error;
+        if (error) {
+            handleApiError(error, 'al actualizar empleado');
+            throw error;
+        }
         await refreshTable('employees');
     };
     
     const deleteEmployee = async (id:any) => {
         const { error } = await supabase.from('employees').delete().eq('id', id);
-        if (error) throw error;
+        if (error) {
+            handleApiError(error, 'al eliminar empleado');
+            throw error;
+        }
         await refreshTable('employees');
     };
 
@@ -476,7 +525,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             currentUser, companies, chartOfAccounts, subjects, costCenters, items, employees,
             institutions, monthlyParameters, vouchers, invoices, feeInvoices, warehouseMovements,
             payslips, users, accountGroups, familyAllowanceBrackets, incomeTaxBrackets, activeCompany,
-            activeCompanyId, activePeriod, periods, isLoading, notifications, login, logout, addNotification,
+            activeCompanyId, activePeriod, periods,isLoading, notifications, login, logout, addNotification,
             setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
             addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany,
             addChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
