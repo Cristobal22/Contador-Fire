@@ -51,8 +51,99 @@ export type ItemData = Omit<Item, 'id'>;
 export type CostCenter = { id: number; code: string; name: string; };
 export type CostCenterData = Omit<CostCenter, 'id'>;
 
-export type Employee = { id: number; rut: string; name: string; position: string; hireDate: string; baseSalary: number; afpId: number; healthId: number; };
+export type Employee = {
+    id: number;
+    // Datos Personales
+    rut: string;
+    name: string;
+    paternal_lastname?: string;
+    maternal_lastname?: string;
+    address?: string;
+    commune?: string;
+    phone?: string;
+    birth_date?: string;
+    nationality?: string;
+    gender?: 'Masculino' | 'Femenino';
+    email?: string;
+    mobile_phone?: string;
+    position?: string;
+    cost_center_code?: string;
+
+    // Sueldo
+    baseSalary: number; // Sueldo Mensual
+    monthly_salary_uf?: number; // Sueldo Mensual en UF (Calculado)
+    daily_salary?: number; // Sueldo Diario (Calculado)
+    hourly_salary?: number; // Sueldo X Hora (Calculado)
+    business_salary?: number;
+
+    // Previsión
+    healthId: number; // Isapre
+    fun_isapre?: string;
+    health_contribution_uf?: number;
+    health_contribution_pesos?: number;
+    collective_health_percentage?: number;
+    afpId: number; // AFP
+    worker_type?: string;
+    afp_account_2?: number;
+    unemployment_insurance?: boolean;
+    family_dependents?: number;
+    apv_amount?: number;
+    apv_amount_uf?: number;
+    apv_provider_id?: number;
+    apv_payment_method?: string;
+    apv_regime_letter?: 'A' | 'B';
+    tax_type?: string;
+    is_agricultural_worker?: boolean;
+    solidarity_loan?: number;
+    apv2_amount_uf?: number;
+    apv2_provider_id?: number;
+    collective_apv_amount?: number;
+    apv2_payment_method?: string;
+    apv2_regime_letter?: 'B';
+    apvc_payment_method?: string;
+    apvc_regime_letter?: 'B';
+    collective_apv_amount_uf?: number;
+    apvc_worker_percentage?: number;
+    caja_loan?: number;
+    caja_loan_2?: number;
+    second_caja?: string;
+    has_accident_insurance?: boolean;
+    first_pension_affiliation_date?: string;
+    is_voluntary_affiliate?: boolean;
+
+    // Contrato
+    hireDate: string; // Fecha Contrato
+    contract_end_date?: string;
+    termination_clause?: string;
+    monthly_meal_allowance?: number;
+    daily_meal_allowance?: number;
+    monthly_transport_allowance?: number;
+    daily_transport_allowance?: number;
+    workday_type?: string;
+    region?: string;
+    contract_commune?: string;
+
+    // Horas Extras
+    weekly_hours?: number;
+    part_time_days?: number;
+    use_minimum_wage?: boolean;
+    overtime_factor?: number;
+
+    // Otros
+    heavy_work_worker_percentage?: number;
+    heavy_work_employer_percentage?: number;
+    is_disabled?: boolean;
+    progressive_vacation_days?: number;
+    years_for_progressive_vacation?: number;
+    is_foreign_tech_pension_exempt?: boolean;
+    has_covid_record?: boolean;
+    bank_id?: number;
+    bank_account_number?: string;
+    is_extreme_zone?: boolean;
+};
+
 export type EmployeeData = Omit<Employee, 'id'>;
+
 
 export type User = { 
     id: string; // Now a UUID string from Supabase Auth
@@ -64,7 +155,7 @@ export type User = {
 };
 export type UserData = Omit<User, 'id'>;
 
-export type Institution = { id: number; name: string; type: 'AFP' | 'Isapre' | 'Fonasa' | 'Otro'; rate?: number; previred_code?: string; dt_code?: string;};
+export type Institution = { id: number; name: string; type: 'AFP' | 'Isapre' | 'Fonasa' | 'Otro' | 'Banco'; rate?: number; previred_code?: string; dt_code?: string;};
 export type InstitutionData = Omit<Institution, 'id'>;
 
 export type MonthlyParameter = { id: number; period: string; name: 'UF' | 'UTM' | 'IPC' | 'Tope Imponible'; value: number; };
@@ -152,7 +243,7 @@ export type SessionContextType = {
 
     // State
     companies: Company[];
-    accounts: ChartOfAccount[];
+    chartOfAccounts: ChartOfAccount[];
     accountGroups: AccountGroup[];
     subjects: Subject[];
     items: Item[];
