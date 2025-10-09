@@ -1,7 +1,4 @@
 
-
-
-
 import React, { ErrorInfo, ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { SessionProvider, useSession } from './context/SessionContext';
@@ -29,7 +26,6 @@ import WarehouseMovementsView from './views/WarehouseMovementsView';
 import PayslipsView from './views/PayslipsView';
 import FeeInvoicesView from './views/FeeInvoicesView';
 import BankReconciliationView from './views/BankReconciliationView';
-import UsersView from './views/UsersView';
 import AccountGroupsView from './views/maestros/AccountGroupsView';
 
 // New specialized views
@@ -48,6 +44,9 @@ import IncomeTaxParametersView from './views/maestros/IncomeTaxParametersView';
 import FamilyAllowanceView from './views/FamilyAllowanceView';
 import SiiCentralizationView from './views/processes/SiiCentralizationView';
 import PreviredImportView from './views/processes/PreviredImportView';
+
+// Admin View
+import AdminUsersView from './views/AdminUsersView'; // Import the new admin view
 
 
 const styles = {
@@ -128,9 +127,6 @@ interface ErrorBoundaryState {
   errorInfo: ErrorInfo | null;
 }
 
-// FIX: Ensure ErrorBoundary extends React.Component to function as a class-based error boundary.
-// This provides access to lifecycle methods like componentDidCatch and state management (this.setState),
-// resolving errors related to missing 'setState' and 'props'.
 class ErrorBoundary extends React.Component<{ children: ReactNode }, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
@@ -305,7 +301,7 @@ const AuthWrapper = () => {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
                 
-                {/* Main application routes available to all logged-in users (Accountants and Admins) */}
+                {/* Main application routes available to Accountants */}
                 {!isSystemAdmin && (
                     <>
                         {/* Contabilidad */}
@@ -349,16 +345,17 @@ const AuthWrapper = () => {
                     </>
                 )}
                 
-                {/* Shared Routes */}
+                {/* Shared Routes for All Users */}
                 <Route path="configuracion/general/empresas" element={<CompaniesView />} />
                 <Route path="configuracion/general/empresas/:companyId" element={<CompanySettingsView />} />
                 <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
 
                 {/* Admin-Only Routes */}
                 {isSystemAdmin && (
-                    <Route path="configuracion/general/usuarios" element={<UsersView />} />
+                    <Route path="admin/users" element={<AdminUsersView />} />
                 )}
                 
+                {/* Fallback Route */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
         </Routes>
@@ -379,7 +376,6 @@ const App = () => {
                 console.error('Uncaught Exception:', error);
             }
 
-            // Avoid setting fatal error for benign resize observer errors which are common in dev
             if (error.message && error.message.includes("ResizeObserver loop limit exceeded")) {
                 console.warn("ResizeObserver loop limit exceeded, ignoring as non-fatal.");
                 return;
