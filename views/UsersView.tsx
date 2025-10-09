@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
 import { GenericForm } from '../components/Forms';
@@ -14,9 +14,15 @@ const UsersView = () => {
 
     const users = [...session.users].sort((a, b) => a.name.localeCompare(b.name));
 
+    const costCenterOptions = useMemo(() => [
+        { value: '', label: 'Sin Asignar' },
+        ...session.costCenters.map(cc => ({ value: cc.id, label: `${cc.code} - ${cc.name}` }))
+    ], [session.costCenters]);
+
     const formFieldsEdit = [
         { name: 'name', label: 'Nombre Completo', type: 'text' },
         { name: 'email', label: 'Email', type: 'email' },
+        { name: 'cost_center_id', label: 'Centro de Costo', type: 'select', options: costCenterOptions },
         { name: 'company_limit', label: 'Límite de Empresas', type: 'number' },
         { name: 'status', label: 'Estado', type: 'select', options: [
             { value: 'active', label: 'Activo' },
@@ -37,6 +43,7 @@ const UsersView = () => {
             status: 'active',
             role: 'Accountant',
             password: '',
+            cost_center_id: ''
         });
         setIsModalOpen(true);
     };
