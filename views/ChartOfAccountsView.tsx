@@ -13,7 +13,7 @@ const ChartOfAccountsView = () => {
                 { key: 'name', header: 'Nombre' },
                 { key: 'type', header: 'Tipo' }
             ]}
-            data={session.accounts}
+            data={session.accounts || []}
             onSave={session.addAccount}
             onUpdate={session.updateAccount}
             onDelete={session.deleteAccount}
