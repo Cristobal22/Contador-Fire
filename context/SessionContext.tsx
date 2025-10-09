@@ -115,6 +115,30 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         addNotification({ type: 'error', message });
     };
 
+    const clearAllData = () => {
+        setCurrentUser(null);
+        setCompanies([]);
+        setChartOfAccounts([]);
+        setSubjects([]);
+        setCostCenters([]);
+        setItems([]);
+        setEmployees([]);
+        setInstitutions([]);
+        setMonthlyParameters([]);
+        setVouchers([]);
+        setInvoices([]);
+        setFeeInvoices([]);
+        setWarehouseMovements([]);
+        setPayslips([]);
+        setUsers([]);
+        setAccountGroups([]);
+        setFamilyAllowanceBrackets([]);
+        setIncomeTaxBrackets([]);
+        setActiveCompanyIdState(null);
+        localStorage.removeItem('activeCompanyId');
+        localStorage.removeItem('activePeriod');
+    };
+
     const fetchDataForCompany = async (companyId: number) => {
         if (!companyId) return;
         addNotification({ type: 'success', message: `Sincronizando datos para la empresa...` });
@@ -218,8 +242,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             if (session?.user) {
                 // Potentially re-fetch or update user profile
             } else {
-                setCurrentUser(null);
-                // Clear all local state
+                clearAllData();
             }
         });
 
@@ -293,10 +316,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await fetchInitialData(userProfile);
         return userProfile;
     };
+    
     const logout = async () => {
         await supabase.auth.signOut();
-        setCurrentUser(null);
+        clearAllData();
     };
+
     const sendPasswordResetEmail = async (email: string) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/update-password' });
         if (error) throw error;
