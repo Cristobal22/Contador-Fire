@@ -3,10 +3,16 @@ import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
 import type { ChartOfAccount } from '../types';
 import Papa from 'papaparse'; // Library to parse CSV files
+import Modal from '../components/Modal'; // Import the new Modal component
 
 const styles: { [key: string]: React.CSSProperties } = {
     container: {
         padding: '2rem',
+    },
+    topActions: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginBottom: '1rem', 
     },
     importPanel: {
         backgroundColor: '#f9f9f9',
@@ -56,6 +62,7 @@ const ChartOfAccountsView = () => {
     const session = useSession();
     const [file, setFile] = useState<File | null>(null);
     const [fileKey, setFileKey] = useState(Date.now()); // To reset file input
+    const [isModalOpen, setIsModalOpen] = useState(false); // State for modal visibility
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
@@ -118,6 +125,7 @@ const ChartOfAccountsView = () => {
                                 }
                             }
                             alert('¡Plan de cuentas predeterminado cargado con éxito!');
+                            setIsModalOpen(false); // Close modal on success
                         } catch (error) {
                             console.error("Error al cargar el plan de cuentas predeterminado:", error);
                             alert('Hubo un error al cargar el plan de cuentas. Revise la consola para más detalles.');
@@ -174,6 +182,7 @@ const ChartOfAccountsView = () => {
                         await session.addChartOfAccount(newAccount);
                     }
                     alert('¡Cuentas importadas con éxito!');
+                    setIsModalOpen(false); // Close modal on success
                 } catch (error) {
                     console.error("Error al importar cuentas:", error);
                     alert('Hubo un error al importar las cuentas. Revise la consola para más detalles.');
@@ -191,36 +200,42 @@ const ChartOfAccountsView = () => {
 
     return (
         <div style={styles.container}>
-            <div style={styles.importPanel}>
-                <h3 style={styles.panelTitle}>Cargar Plan de Cuentas Predeterminado</h3>
-                <p>
-                    Puedes cargar un plan de cuentas estándar basado en las mejores prácticas contables.
-                </p>
-                <small style={styles.warningText}>
-                    Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
-                </small>
-                <br />
-                <button style={styles.button} onClick={handleLoadDefaultChartOfAccounts}>Cargar Plan Predeterminado</button>
+            <div style={styles.topActions}>
+                <button style={styles.button} onClick={() => setIsModalOpen(true)}>Modificar Plan de Cuentas</button>
             </div>
 
-            <div style={styles.importPanel}>
-                <h3 style={styles.panelTitle}>Importar Plan de Cuentas Personalizado</h3>
-                <p>
-                    O puedes cargar masivamente tu plan de cuentas usando un archivo CSV.
-                    <span onClick={handleDownloadTemplate} style={styles.textLink}> Descargar plantilla</span>.
-                </p>
-                <div style={styles.formGroup}>
-                    <label>Cargar archivo de plan de cuentas (.csv)</label>
-                    <input type="file" key={fileKey} accept=".csv" style={styles.fileInput} onChange={handleFileChange} />
-                    <small style={styles.smallText}>
-                        Formato esperado: {CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.join(', ')}
-                    </small>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Modificar Plan de Cuentas">
+                <div style={styles.importPanel}>
+                    <h3 style={styles.panelTitle}>Cargar Plan de Cuentas Predeterminado</h3>
+                    <p>
+                        Puedes cargar un plan de cuentas estándar basado en las mejores prácticas contables.
+                    </p>
                     <small style={styles.warningText}>
                         Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
                     </small>
+                    <br />
+                    <button style={styles.button} onClick={handleLoadDefaultChartOfAccounts}>Cargar Plan Predeterminado</button>
                 </div>
-                <button style={styles.button} onClick={handleImport} disabled={!file}>Importar Cuentas</button>
-            </div>
+
+                <div style={styles.importPanel}>
+                    <h3 style={styles.panelTitle}>Importar Plan de Cuentas Personalizado</h3>
+                    <p>
+                        O puedes cargar masivamente tu plan de cuentas usando un archivo CSV.
+                        <span onClick={handleDownloadTemplate} style={styles.textLink}> Descargar plantilla</span>.
+                    </p>
+                    <div style={styles.formGroup}>
+                        <label>Cargar archivo de plan de cuentas (.csv)</label>
+                        <input type="file" key={fileKey} accept=".csv" style={styles.fileInput} onChange={handleFileChange} />
+                        <small style={styles.smallText}>
+                            Formato esperado: {CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.join(', ')}
+                        </small>
+                        <small style={styles.warningText}>
+                            Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
+                        </small>
+                    </div>
+                    <button style={styles.button} onClick={handleImport} disabled={!file}>Importar Cuentas</button>
+                </div>
+            </Modal>
 
             <CrudView<ChartOfAccount>
                 title="Cuenta"
