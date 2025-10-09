@@ -45,7 +45,15 @@ export const GenericForm = <T extends object>({ onSave, onCancel, initialData, f
         setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(formData); };
+    const handleSubmit = (e: React.FormEvert) => {
+        e.preventDefault();
+        const dataToSave = { ...formData };
+        if (dataToSave.afpld) {
+            dataToSave.afpId = dataToSave.afpld;
+            delete dataToSave.afpld;
+        }
+        onSave(dataToSave);
+    };
 
     return (
         <form onSubmit={handleSubmit}>
