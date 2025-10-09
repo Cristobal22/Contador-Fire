@@ -19,12 +19,12 @@ const JournalLedgerView = () => {
 
     const getAccountDisplay = (id: number | '') => {
         if (id === '') return 'N/A';
-        const account = accounts.find(a => a.id === id);
+        const account = (accounts || []).find(a => a.id === id);
         return account ? `${account.code} - ${account.name}` : 'Cuenta no encontrada';
     };
 
     const ledgerEntries = useMemo(() => {
-        return vouchers
+        return (vouchers || [])
             .map(voucher => 
                 voucher.entries.map(entry => ({
                     voucherId: voucher.id,
