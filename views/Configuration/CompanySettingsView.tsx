@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
 import type { Company } from '../../types';
+import { AccountSearchModal } from './AccountSearchModal';
 
 const initialFormData: Partial<Company> = {
     is_distributor: false,
@@ -69,6 +70,8 @@ export const CompanySettingsView: React.FC = () => {
     const [formData, setFormData] = useState<Partial<Company>>(initialFormData);
     const [isSaving, setIsSaving] = useState(false);
     const [openAccordion, setOpenAccordion] = useState<string | null>('Resultados');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [targetField, setTargetField] = useState<keyof Company | null>(null);
 
     useEffect(() => {
         const companyToLoad = companies.find(c => c.id === Number(companyId));
@@ -110,6 +113,17 @@ export const CompanySettingsView: React.FC = () => {
             addNotification({ type: 'info', message: 'Cambios cancelados.' });
         }
     };
+
+    const handleOpenModal = (fieldName: keyof Company) => {
+        setTargetField(fieldName);
+        setIsModalOpen(true);
+    };
+
+    const handleSelectAccount = (accountCode: string) => {
+        if (targetField) {
+            setFormData(prev => ({ ...prev, [targetField]: accountCode }));
+        }
+    };
     
     const renderAccountInput = (label: string, name: keyof Company) => {
         const accountCode = formData[name] as string || '';
@@ -129,7 +143,7 @@ export const CompanySettingsView: React.FC = () => {
                             onChange={handleInputChange}
                             style={{ flex: '0 0 120px' }}
                         />
-                        <button className="btn btn-outline-secondary d-flex align-items-center" type="button">
+                        <button className="btn btn-outline-secondary d-flex align-items-center" type="button" onClick={() => handleOpenModal(name)}>
                             <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>search</span>
                         </button>
                         <input type="text" className="form-control bg-light" readOnly value={accountName} />
@@ -238,7 +252,7 @@ export const CompanySettingsView: React.FC = () => {
                     <AccountGroup title="Ingresos Honorarios" isOpen={openAccordion === 'Ingresos Honorarios'} onToggle={() => handleAccordionToggle('Ingresos Honorarios')}>
                         {renderAccountInput('Clientes Honorarios', 'client_fees_account')}
                         {renderAccountInput('Retenciones por Pagar', 'retentions_to_pay_account')}
-                        {renderAccountInput('Retenciones por Cobrar', 'retentions_to_collect_account')}
+                        {renderAccountInput('Retenciones por Cobrar', 'retenciones_to_collect_account')}
                     </AccountGroup>
                     <AccountGroup title="Flujo Efectivo" isOpen={openAccordion === 'Flujo Efectivo'} onToggle={() => handleAccordionToggle('Flujo Efectivo')}>
                         {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account')}
@@ -265,6 +279,13 @@ export const CompanySettingsView: React.FC = () => {
                 </div>
 
             </div>
+
+            <AccountSearchModal 
+                show={isModalOpen} 
+                onHide={() => setIsModalOpen(false)} 
+                onSelectAccount={handleSelectAccount} 
+                accounts={accounts || []} 
+            />
         </div>
     );
 };
