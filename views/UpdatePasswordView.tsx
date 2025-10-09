@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { useSession } from '../context/SessionContext';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient'; 
+import { useSession } from '../context/SessionContext';
 
 const styles = {
     container: {
@@ -37,21 +38,11 @@ const styles = {
 } as const;
 
 const UpdatePasswordView = () => {
-    const { session, updatePassword, addNotification } = useSession();
+    const { addNotification } = useSession();
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        if (!session) {
-            addNotification({
-                type: 'error',
-                message: 'Debe iniciar sesión para actualizar su contraseña.'
-            });
-            navigate('/login');
-        }
-    }, [session, navigate, addNotification]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,7 +57,9 @@ const UpdatePasswordView = () => {
 
         setIsLoading(true);
         try {
-            await updatePassword(password);
+            const { error } = await supabase.auth.updateUser({ password });
+            if (error) throw error;
+
             addNotification({
                 type: 'success',
                 message: 'Contraseña actualizada correctamente. Por favor, inicie sesión.'
