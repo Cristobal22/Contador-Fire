@@ -20,7 +20,7 @@ const BalancesView = () => {
     const balanceData = useMemo(() => {
         const accountTotals = new Map<number, { debit: number; credit: number }>();
 
-        vouchers.forEach(voucher => {
+        (vouchers || []).forEach(voucher => {
             voucher.entries.forEach(entry => {
                 const accountId = entry.accountId;
                 if (accountId === '') return;
@@ -32,7 +32,7 @@ const BalancesView = () => {
             });
         });
 
-        const rows = accounts
+        const rows = (accounts || [])
             .map(account => {
                 const totals = accountTotals.get(account.id);
                 if (!totals || (totals.debit === 0 && totals.credit === 0)) {

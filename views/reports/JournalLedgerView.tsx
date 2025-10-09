@@ -26,7 +26,7 @@ const JournalLedgerView = () => {
     const ledgerEntries = useMemo(() => {
         return (vouchers || [])
             .map(voucher => 
-                voucher.entries.map(entry => ({
+                (voucher.entries || []).map(entry => ({
                     voucherId: voucher.id,
                     date: voucher.date,
                     description: voucher.description,

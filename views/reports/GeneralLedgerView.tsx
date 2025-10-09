@@ -58,7 +58,7 @@ const GeneralLedgerView = () => {
         if (!selectedAccountId) return null;
 
         const allEntries = (vouchers || [])
-            .flatMap(v => v.entries.map(e => ({ ...e, date: v.date, description: v.description, voucherId: v.id })))
+            .flatMap(v => (v.entries || []).map(e => ({ ...e, date: v.date, description: v.description, voucherId: v.id })))
             .filter(e => e.accountId === selectedAccountId)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
