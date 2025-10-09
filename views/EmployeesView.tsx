@@ -2,22 +2,13 @@ import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
 import { formatRut } from '../utils/format';
-import type { Employee, EmployeeData } from '../types';
+import type { Employee } from '../types';
 
 const EmployeesView = () => {
     const session = useSession();
     
     const afpOptions = (session.institutions || []).filter(i => i.type === 'AFP').map(i => ({ value: i.id, label: i.name }));
     const healthOptions = (session.institutions || []).filter(i => i.type === 'Isapre' || i.type === 'Fonasa').map(i => ({ value: i.id, label: i.name }));
-
-    const handleSave = async (data: EmployeeData) => {
-        const correctedData = { ...data };
-        if ('afpld' in correctedData) {
-            correctedData.afpId = (correctedData as any).afpld;
-            delete (correctedData as any).afpld;
-        }
-        await session.addEmployee(correctedData);
-    };
 
     return (
         <CrudView<Employee>
@@ -30,7 +21,7 @@ const EmployeesView = () => {
                 { key: 'hireDate', header: 'Fecha Contratación' }
             ]}
             data={session.employees}
-            onSave={handleSave}
+            onSave={session.addEmployee}
             onUpdate={session.updateEmployee}
             onDelete={session.deleteEmployee}
             formFields={[

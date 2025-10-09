@@ -70,11 +70,6 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
                 return;
             }
         }
-
-        if ((dataToSave as any).afpld) {
-            (dataToSave as any).afpId = (dataToSave as any).afpld;
-            delete (dataToSave as any).afpld;
-        }
         
         try {
             if (isEditing) {

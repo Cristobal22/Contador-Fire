@@ -428,11 +428,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
         
         const employeeToSave = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
-        
-        if (employeeToSave.hasOwnProperty('afpld')) {
-            employeeToSave.afpId = employeeToSave.afpld;
-            delete employeeToSave.afpld;
-        }
 
         console.log('Attempting to save employee:', employeeToSave);
 
@@ -443,11 +438,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const updateEmployee = async (employee: any) => {
         const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
-        
-        if (employeeToUpdate.hasOwnProperty('afpld')) {
-            employeeToUpdate.afpId = employeeToUpdate.afpld;
-            delete employeeToUpdate.afpld;
-        }
 
         console.log('Attempting to update employee:', employeeToUpdate);
 

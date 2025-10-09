@@ -47,15 +47,7 @@ export const GenericForm = <T extends object>({ onSave, onCancel, initialData, f
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const dataToSave = { ...formData } as any;
-
-        // Correction logic for afpld
-        if (dataToSave.hasOwnProperty('afpld')) {
-            dataToSave.afpId = dataToSave.afpld;
-            delete dataToSave.afpld;
-        }
-
-        onSave(dataToSave as T);
+        onSave(formData as T);
     };
 
     return (
