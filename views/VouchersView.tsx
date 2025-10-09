@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
 import { VoucherForm } from '../components/Forms';
-import type { Voucher, VoucherData } from '../types';
+import type { Voucher, VoucherData, ChartOfAccount } from '../types';
 
-const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: {id: number, name: string, code: string}[] }> = ({ voucher, onClose, accounts }) => {
+const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: ChartOfAccount[] }> = ({ voucher, onClose, accounts }) => {
     if (!voucher) return null;
     
     const getAccountName = (id: number | '') => (accounts || []).find(a => a.id === id)?.name || 'N/A';
@@ -53,7 +53,7 @@ const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => voi
 
 
 const VouchersView: React.FC = () => {
-    const { vouchers, addVoucher, updateVoucher, deleteVoucher, addNotification, accounts, handleApiError } = useSession();
+    const { vouchers, chartOfAccounts, addVoucher, updateVoucher, deleteVoucher, addNotification, handleApiError } = useSession();
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
@@ -132,10 +132,10 @@ const VouchersView: React.FC = () => {
             </table>
             
             <Modal isOpen={isFormModalOpen} onClose={handleCloseForm} title={editingVoucher ? 'Editar Comprobante' : 'Agregar Nuevo Comprobante'} size="lg">
-                <VoucherForm onSave={handleSave} onCancel={handleCloseForm} isLoading={isLoading} initialData={editingVoucher} />
+                <VoucherForm onSave={handleSave} onCancel={handleCloseForm} isLoading={isLoading} initialData={editingVoucher} accounts={chartOfAccounts} />
             </Modal>
             
-            <VoucherDetailModal voucher={viewingVoucher} onClose={() => setViewingVoucher(null)} accounts={accounts} />
+            <VoucherDetailModal voucher={viewingVoucher} onClose={() => setViewingVoucher(null)} accounts={chartOfAccounts} />
         </div>
     );
 };
