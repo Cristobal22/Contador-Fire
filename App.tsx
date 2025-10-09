@@ -15,6 +15,7 @@ import { SearchModal } from './components/SearchModal';
 import LoginView from './views/LoginView';
 import DashboardView from './views/DashboardView';
 import CompaniesView from './views/CompaniesView';
+import { CompanySettingsView } from './views/Configuration/CompanySettingsView';
 import ChartOfAccountsView from './views/ChartOfAccountsView';
 import SubjectsView from './views/SubjectsView';
 import CostCentersView from './views/CostCentersView';
@@ -350,6 +351,7 @@ const AuthWrapper = () => {
                 
                 {/* Shared Routes */}
                 <Route path="configuracion/general/empresas" element={<CompaniesView />} />
+                <Route path="configuracion/general/empresas/:companyId" element={<CompanySettingsView />} />
                 <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
 
                 {/* Admin-Only Routes */}

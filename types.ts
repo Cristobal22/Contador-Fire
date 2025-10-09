@@ -1,5 +1,40 @@
-export type Company = { id: number; rut: string; name: string; address: string; owner_id: string; } // owner_id is now UUID string
-export type CompanyData = Omit<Company, 'id' | 'owner_id'>;
+export type Company = {
+    id: number;
+    rut: string;
+    business_name: string; // Renamed from name
+    address?: string;
+    owner_id: string;
+
+    // Configuration settings - all optional
+    is_distributor?: boolean;
+    year?: number;
+    initial_date?: string;
+    final_date?: string;
+    profit_account?: string;
+    loss_account?: string;
+    invoices_to_collect_account?: string;
+    bills_to_collect_account?: string;
+    vat_account?: string;
+    other_taxes_account?: string;
+    proportional_vat?: boolean;
+    invoices_to_pay_account?: string;
+    bills_to_pay_account?: string;
+    vat_credit_account?: string;
+    other_taxes_to_pay_account?: string;
+    fees_to_pay_account?: string;
+    second_category_retentions_account?: string;
+    client_fees_account?: string;
+    retentions_to_pay_account?: string;
+    retentions_to_collect_account?: string;
+    cash_equivalent_account?: string;
+    partner_withdrawal_account?: string;
+    made_by?: string;
+    reviewed_by?: string;
+    approved_by?: string;
+};
+
+// CompanyData for creation only needs essential fields
+export type CompanyData = Pick<Company, 'rut' | 'business_name' | 'address'>;
 
 export type ChartOfAccount = { id: number; code: string; name: string; type: string; }
 export type ChartOfAccountData = Omit<ChartOfAccount, 'id'>;
@@ -140,7 +175,7 @@ export type SessionContextType = {
 
     // Actions
     addCompany: (data: CompanyData) => Promise<void>;
-    updateCompany: (data: Company) => Promise<void>;
+    updateCompany: (id: number, data: Partial<Company>) => Promise<void>;
     deleteCompany: (id: number) => Promise<void>;
     addAccount: (data: ChartOfAccountData) => Promise<void>;
     updateAccount: (data: ChartOfAccount) => Promise<void>;

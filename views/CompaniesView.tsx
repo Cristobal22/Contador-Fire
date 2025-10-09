@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
 import { formatRut } from '../utils/format';
@@ -6,26 +7,45 @@ import type { Company } from '../types';
 
 const CompaniesView = () => {
     const session = useSession();
+    const navigate = useNavigate();
     const { currentUser } = session;
     
     const userCompanies = (session.companies || []).filter(c => currentUser && c.owner_id === currentUser.id);
+
+    const handleConfigureClick = (companyId: number) => {
+        navigate(`/configuracion/general/empresas/${companyId}`);
+    };
 
     return (
         <CrudView<Company>
             title="Empresa"
             columns={[
                 { key: 'rut', header: 'RUT', render: (rut) => formatRut(rut) },
-                { key: 'name', header: 'Razón Social' },
-                { key: 'address', header: 'Dirección' }
+                { key: 'business_name', header: 'Razón Social' },
+                { key: 'address', header: 'Dirección' },
+                { key: 'year', header: 'Año de Inicio' },
+                {
+                    key: 'actions',
+                    header: 'Configurar',
+                    render: (_, record) => (
+                        <button 
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => handleConfigureClick(record.id)}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle'}}>settings</span>
+                        </button>
+                    )
+                }
             ]}
             data={userCompanies}
-            onSave={session.addCompany}
+            onSave={(company) => session.addCompany(company)}
             onUpdate={session.updateCompany}
             onDelete={session.deleteCompany}
             formFields={[
-                { name: 'rut', label: 'RUT', type: 'text' },
-                { name: 'name', label: 'Razón Social', type: 'text' },
-                { name: 'address', label: 'Dirección', type: 'text' }
+                { name: 'rut', label: 'RUT', type: 'text', required: true },
+                { name: 'business_name', label: 'Razón Social', type: 'text', required: true },
+                { name: 'address', label: 'Dirección', type: 'text' },
+                { name: 'year', label: 'Año de Inicio', type: 'number', required: true },
             ]}
         />
     );

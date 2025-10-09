@@ -1,12 +1,15 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { unformatRut } from '../utils/format';
-import type { User, Company, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowance, Notification, AnyTable, UserData } from '../types';
+// Import CompanyData and allow Partial for updates
+import type { User, Company, CompanyData, ChartOfAccount, Subject, CostCenter, Item, Employee, Institution, MonthlyParameter, Voucher, Invoice, FeeInvoice, WarehouseMovement, Payslip, BankReconciliation, AccountGroup, FamilyAllowanceBracket, Notification, AnyTable, UserData, IncomeTaxBracket } from '../types';
 
-interface Session {
+interface SessionContextType {
     currentUser: User | null;
     companies: Company[];
     activeCompany: Company | null;
+    activeCompanyId: number | null;
     activePeriod: string;
     periods: { value: string; label: string; }[];
     isLoading: boolean;
@@ -23,14 +26,14 @@ interface Session {
     feeInvoices: FeeInvoice[];
     warehouseMovements: WarehouseMovement[];
     payslips: Payslip[];
-    bankReconciliations: BankReconciliation[];
     users: User[];
     accountGroups: AccountGroup[];
-    familyAllowances: FamilyAllowance[];
+    familyAllowanceBrackets: FamilyAllowanceBracket[];
+    incomeTaxBrackets: IncomeTaxBracket[];
     login: (email: string, pass: string) => Promise<User>;
     logout: () => void;
-    addNotification: (notification: Notification) => void;
-    switchCompany: (id: number) => void;
+    addNotification: (notification: Omit<Notification, 'id'>) => void;
+    setActiveCompanyId: (id: number | null) => void;
     setActivePeriod: (period: string) => void;
     sendPasswordResetEmail: (email: string) => Promise<void>;
     fetchDataForCompany: (companyId: number) => Promise<void>;
@@ -39,18 +42,20 @@ interface Session {
     updateUser: (user: User) => Promise<void>;
     deleteUser: (userId: string) => Promise<void>;
     handleApiError: (error: any, context: string) => void;
-    addCompany: (company: Omit<Company, 'id' | 'owner_id'>) => Promise<void>;
-    updateCompany: (company: Company) => Promise<void>;
-    deleteCompany: (id: number) => Promise<void>;
+    // Updated signatures for company management
+    addCompany: (company: CompanyData) => Promise<void>;
+    updateCompany: (id: number, data: Partial<Company>) => Promise<void>;
+    deleteCompany: (id: number | string) => Promise<void>;
+    // Other specific data actions
     addSubject: (subject: Omit<Subject, 'id' | 'company_id'>) => Promise<void>;
     updateSubject: (subject: Subject) => Promise<void>;
-    deleteSubject: (id: number) => Promise<void>;
+    deleteSubject: (id: number | string) => Promise<void>;
     addEmployee: (employee: Omit<Employee, 'id' | 'company_id'>) => Promise<void>;
     updateEmployee: (employee: Employee) => Promise<void>;
-    deleteEmployee: (id: number) => Promise<void>;
+    deleteEmployee: (id: number | string) => Promise<void>;
 }
 
-const SessionContext = createContext<Session | undefined>(undefined);
+const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 const generatePeriods = () => {
     const periods = [];
@@ -80,10 +85,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [feeInvoices, setFeeInvoices] = useState<FeeInvoice[]>([]);
     const [warehouseMovements, setWarehouseMovements] = useState<WarehouseMovement[]>([]);
     const [payslips, setPayslips] = useState<Payslip[]>([]);
-    const [bankReconciliations, setBankReconciliations] = useState<BankReconciliation[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
-    const [familyAllowances, setFamilyAllowances] = useState<FamilyAllowance[]>([]);
+    const [familyAllowanceBrackets, setFamilyAllowanceBrackets] = useState<FamilyAllowanceBracket[]>([]);
+    const [incomeTaxBrackets, setIncomeTaxBrackets] = useState<IncomeTaxBracket[]>([]);
     const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(null);
     const [activePeriod, setActivePeriodState] = useState<string>(() => {
         const today = new Date();
@@ -97,7 +102,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         return companies.find(c => c.id === activeCompanyId) || null;
     }, [companies, activeCompanyId]);
 
-    const addNotification = (notification: Notification) => {
+    const addNotification = (notification: Omit<Notification, 'id'>) => {
         const newId = Date.now();
         setNotifications(prev => [...prev, { ...notification, id: newId }]);
         setTimeout(() => {
@@ -112,22 +117,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchDataForCompany = async (companyId: number) => {
         if (!companyId) return;
-        addNotification({ type: 'info', message: `Sincronizando datos para la empresa...` });
+        addNotification({ type: 'success', message: `Sincronizando datos para la empresa...` });
 
         try {
             const companySpecificTables: (keyof AnyTable)[] = [
                 'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
                 'institutions', 'monthly_parameters', 'vouchers', 'invoices',
-                'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
-                'account_groups', 'family_allowances'
+                'fee_invoices', 'warehouse_movements', 'payslips',
+                'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
             ];
 
             const promises = companySpecificTables.map(tableName =>
                 supabase.from(tableName).select('*').eq('company_id', companyId).then(({ data, error }) => {
-                    if (error) {
-                        console.error(`Error fetching ${tableName} for company ${companyId}:`, error);
-                        throw new Error(`Error fetching ${tableName}: ${error.message}`);
-                    }
+                    if (error) throw new Error(`Error fetching ${tableName}: ${error.message}`);
                     return { [tableName]: data || [] };
                 })
             );
@@ -147,9 +149,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             setFeeInvoices(companyData.fee_invoices || []);
             setWarehouseMovements(companyData.warehouse_movements || []);
             setPayslips(companyData.payslips || []);
-            setBankReconciliations(companyData.bank_reconciliations || []);
             setAccountGroups(companyData.account_groups || []);
-            setFamilyAllowances(companyData.family_allowances || []);
+            setFamilyAllowanceBrackets(companyData.family_allowance_brackets || []);
+            setIncomeTaxBrackets(companyData.income_tax_brackets || []);
 
             addNotification({ type: 'success', message: 'Datos sincronizados correctamente.' });
         } catch (error: any) {
@@ -170,17 +172,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 setUsers(usersData || []);
             }
 
-            const userCompanies = (companiesData || []).filter(c => c.owner_id === user.id);
+            const userHasCompanies = (companiesData || []).some(c => c.owner_id === user.id);
             let companyToLoad: number | null = null;
 
-            if (user.role === 'Accountant' && userCompanies.length > 0) {
+            if (userHasCompanies) {
                 const storedCompanyId = localStorage.getItem('activeCompanyId');
                 const storedCompanyIdNum = storedCompanyId ? parseInt(storedCompanyId, 10) : null;
 
-                if (storedCompanyIdNum && userCompanies.some(c => c.id === storedCompanyIdNum)) {
+                if (storedCompanyIdNum && (companiesData || []).some(c => c.id === storedCompanyIdNum)) {
                     companyToLoad = storedCompanyIdNum;
                 } else {
-                    companyToLoad = userCompanies[0].id;
+                    companyToLoad = (companiesData || []).find(c => c.owner_id === user.id)!.id;
                 }
                 
                 if (companyToLoad) {
@@ -197,62 +199,39 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     useEffect(() => {
-        setIsLoading(true); 
-    
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-                if (session?.user) {
-                    const { data: userProfile, error } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-                    if (error) {
-                        handleApiError(error, "al cargar el perfil de usuario");
-                        setIsLoading(false);
-                        return;
-                    }
-                    if (userProfile) {
-                        setCurrentUser(userProfile);
-                        await fetchInitialData(userProfile);
-                    } else {
-                        handleApiError({ message: "No se encontró el perfil para el usuario." }, "en la carga inicial");
-                        setIsLoading(false);
-                    }
-                } else {
-                    setIsLoading(false);
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const { data: userProfile, error } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+                if (error) {
+                    handleApiError(error, "al cargar el perfil de usuario");
+                } else if (userProfile) {
+                    setCurrentUser(userProfile);
+                    await fetchInitialData(userProfile);
                 }
-            } else if (event === 'SIGNED_OUT') {
+            }
+            setIsLoading(false);
+        };
+        checkSession();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                // Potentially re-fetch or update user profile
+            } else {
                 setCurrentUser(null);
-                setCompanies([]);
-                setChartOfAccounts([]);
-                setSubjects([]);
-                setCostCenters([]);
-                setItems([]);
-                setEmployees([]);
-                setInstitutions([]);
-                setMonthlyParameters([]);
-                setVouchers([]);
-                setInvoices([]);
-                setFeeInvoices([]);
-                setWarehouseMovements([]);
-                setPayslips([]);
-                setBankReconciliations([]);
-                setUsers([]);
-                setAccountGroups([]);
-                setFamilyAllowances([]);
-                setActiveCompanyIdState(null);
-                localStorage.removeItem('activeCompanyId');
-                setIsLoading(false);
+                // Clear all local state
             }
         });
-    
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
+
+        return () => authListener.subscription.unsubscribe();
     }, []);
 
-    const switchCompany = (id: number) => {
-        if (id === activeCompanyId) return;
-        localStorage.setItem('activeCompanyId', id.toString());
-        setActiveCompanyIdState(id);
-        fetchDataForCompany(id);
+    const setActiveCompanyId = (id: number | null) => {
+        if (id !== activeCompanyId) {
+            localStorage.setItem('activeCompanyId', String(id));
+            setActiveCompanyIdState(id);
+            if (id) fetchDataForCompany(id);
+        }
     };
 
     const setActivePeriod = (period: string) => {
@@ -261,30 +240,23 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const refreshTable = async <T extends keyof AnyTable>(tableName: T) => {
-        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users') {
-            console.warn(`Cannot refresh ${tableName} without an active company.`);
-            return;
-        }
-    
-        console.log(`Refreshing table: ${tableName}`);
+        if (!activeCompanyId && tableName !== 'companies' && tableName !== 'users') return;
         try {
             let query = supabase.from(tableName).select('*');
-    
             const companySpecificTables: (keyof AnyTable)[] = [
                 'chart_of_accounts', 'subjects', 'cost_centers', 'items', 'employees',
                 'institutions', 'monthly_parameters', 'vouchers', 'invoices',
-                'fee_invoices', 'warehouse_movements', 'payslips', 'bank_reconciliations',
-                'account_groups', 'family_allowances'
+                'fee_invoices', 'warehouse_movements', 'payslips',
+                'account_groups', 'family_allowance_brackets', 'income_tax_brackets'
             ];
-    
             if (activeCompanyId && companySpecificTables.includes(tableName)) {
                 query = query.eq('company_id', activeCompanyId);
             }
     
             const { data, error } = await query;
             if (error) throw error;
-    
-            const setters: Record<keyof AnyTable, React.Dispatch<React.SetStateAction<any>>> = {
+
+            const setters: { [K in keyof AnyTable]: React.Dispatch<React.SetStateAction<any>> } = {
                 companies: setCompanies,
                 chart_of_accounts: setChartOfAccounts,
                 subjects: setSubjects,
@@ -298,219 +270,131 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 fee_invoices: setFeeInvoices,
                 warehouse_movements: setWarehouseMovements,
                 payslips: setPayslips,
-                bank_reconciliations: setBankReconciliations,
                 users: setUsers,
                 account_groups: setAccountGroups,
-                family_allowances: setFamilyAllowances,
+                family_allowance_brackets: setFamilyAllowanceBrackets,
+                income_tax_brackets: setIncomeTaxBrackets,
             };
     
-            const setter = setters[tableName];
-            if (setter) {
-                setter(data || []);
-                addNotification({ type: 'success', message: `Tabla '${tableName}' actualizada.` });
-            } else {
-                 console.warn(`No state setter found for table: ${tableName}`);
-            }
+            if (setters[tableName]) setters[tableName](data || []);
+
         } catch (error: any) {
             handleApiError(error, `al refrescar la tabla ${tableName}`);
         }
     };
 
-    const addUser = async (userData: UserData, password: string, setLoadingMessage: (message: string) => void): Promise<User> => {
-        setLoadingMessage("Invocando función de creación de usuario...");
-        const { data, error } = await supabase.functions.invoke('create-user', {
-            body: { userData, password },
-        });
-
-        if (error) {
-            throw new Error(`Error en la función: ${error.message}`);
-        }
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        setLoadingMessage("Usuario creado, actualizando la tabla local...");
-        await refreshTable('users');
-        return data.user;
-    };
-
-    const updateUser = async (user: User) => {
-        const { error } = await supabase.functions.invoke('update-user', {
-            body: { userId: user.id, updates: user },
-        });
-        if (error) throw error;
-        await refreshTable('users');
-    };
-
-    const deleteUser = async (userId: string) => {
-        const { error } = await supabase.functions.invoke('delete-user', {
-            body: { userId },
-        });
-        if (error) throw error;
-        await refreshTable('users');
-    };
-
+    // Auth and User Management
     const login = async (email: string, pass: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-        if (error) {
-            if (error.message.includes("Invalid login credentials")) {
-                throw new Error("El correo o la contraseña no son correctos. Por favor, inténtelo de nuevo.");
-            }
-            throw error;
-        }
-
-        if (!data.user) throw new Error('Login failed: No user found.');
-        
-        const { data: userProfile, error: profileError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-        if (profileError) throw profileError;
-        if (!userProfile) throw new Error('Login failed: No user profile found.');
-        
+        if (error || !data.user) throw new Error(error?.message || "Login failed");
+        const { data: userProfile, error: profileError } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+        if (profileError || !userProfile) throw new Error(profileError?.message || "Profile not found");
+        setCurrentUser(userProfile);
+        await fetchInitialData(userProfile);
         return userProfile;
     };
-
     const logout = async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
     };
-
     const sendPasswordResetEmail = async (email: string) => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-             redirectTo: window.location.origin + '/update-password',
-        });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/update-password' });
         if (error) throw error;
     };
-
-    const addCompany = async (company: Omit<Company, 'id' | 'owner_id'>) => {
-        if (!currentUser) {
-            handleApiError({ message: 'Usuario no autenticado' }, 'al agregar empresa');
-            return;
-        }
-        try {
-            const newCompany = { ...company, rut: unformatRut(company.rut), owner_id: currentUser.id };
-            const { error } = await supabase.from('companies').insert(newCompany);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empresa agregada correctamente.' });
-            await refreshTable('companies');
-        } catch (error: any) {
-            handleApiError(error, 'al agregar la empresa');
-        }
+    const addUser = async (userData, password, setLoadingMessage) => {
+        setLoadingMessage("Invocando función...");
+        const { data, error } = await supabase.functions.invoke('create-user', { body: { userData, password } });
+        if (error || data.error) throw new Error(error?.message || data.error);
+        setLoadingMessage("Actualizando tabla local...");
+        await refreshTable('users');
+        return data.user;
+    };
+    const updateUser = async (user) => {
+        const { error } = await supabase.functions.invoke('update-user', { body: { userId: user.id, updates: user } });
+        if (error) throw error;
+        await refreshTable('users');
+    };
+    const deleteUser = async (userId) => {
+        const { error } = await supabase.functions.invoke('delete-user', { body: { userId } });
+        if (error) throw error;
+        await refreshTable('users');
     };
 
-    const updateCompany = async (company: Company) => {
-        try {
-            const companyToUpdate = { ...company, rut: unformatRut(company.rut) };
-            const { error } = await supabase.from('companies').update(companyToUpdate).eq('id', company.id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empresa actualizada correctamente.' });
-            await refreshTable('companies');
-        } catch (error: any) {
-            handleApiError(error, 'al actualizar la empresa');
-        }
+    // Company Management (Updated)
+    const addCompany = async (company: CompanyData) => {
+        if (!currentUser) throw new Error('Usuario no autenticado');
+        const newCompany = { ...company, rut: unformatRut(company.rut), owner_id: currentUser.id };
+        const { data, error } = await supabase.from('companies').insert(newCompany).select().single();
+        if (error) throw error;
+        if (data) setCompanies(prev => [...prev, data]);
     };
-
-    const deleteCompany = async (id: number) => {
-        try {
-            const { error } = await supabase.from('companies').delete().eq('id', id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empresa eliminada correctamente.' });
-            await refreshTable('companies');
-        } catch (error: any) {
-            handleApiError(error, 'al eliminar la empresa');
+    
+    const updateCompany = async (id: number, updates: Partial<Company>) => {
+        if (updates.rut) updates.rut = unformatRut(updates.rut);
+        const { data, error } = await supabase.from('companies').update(updates).eq('id', id).select().single();
+        if (error) throw error;
+        if (data) {
+            setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
         }
     };
     
-    const addSubject = async (subject: Omit<Subject, 'id' | 'company_id'>) => {
-        if (!activeCompany) {
-            handleApiError({ message: 'No hay una empresa activa' }, 'al agregar sujeto');
-            return;
-        }
-        try {
-            const newSubject = { ...subject, rut: unformatRut(subject.rut), company_id: activeCompany.id };
-            const { error } = await supabase.from('subjects').insert(newSubject);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Sujeto agregado correctamente.' });
-            await refreshTable('subjects');
-        } catch (error: any) {
-            handleApiError(error, 'al agregar el sujeto');
-        }
+    const deleteCompany = async (id: number | string) => {
+        const { error } = await supabase.from('companies').delete().eq('id', id);
+        if (error) throw error;
+        setCompanies(prev => prev.filter(c => c.id !== id));
     };
-
-    const updateSubject = async (subject: Subject) => {
-        try {
-            const subjectToUpdate = { ...subject, rut: unformatRut(subject.rut) };
-            const { error } = await supabase.from('subjects').update(subjectToUpdate).eq('id', subject.id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Sujeto actualizado correctamente.' });
-            await refreshTable('subjects');
-        } catch (error: any) {
-            handleApiError(error, 'al actualizar el sujeto');
-        }
+    
+    // Subject Management
+    const addSubject = async (subject) => {
+        if (!activeCompany) throw new Error('No hay una empresa activa');
+        const newSubject = { ...subject, rut: unformatRut(subject.rut), company_id: activeCompany.id };
+        const { error } = await supabase.from('subjects').insert(newSubject);
+        if (error) throw error;
+        await refreshTable('subjects');
     };
-
-    const deleteSubject = async (id: number) => {
-        try {
-            const { error } = await supabase.from('subjects').delete().eq('id', id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Sujeto eliminado correctamente.' });
-            await refreshTable('subjects');
-        } catch (error: any) {
-            handleApiError(error, 'al eliminar el sujeto');
-        }
+    
+    const updateSubject = async (subject) => {
+        const subjectToUpdate = { ...subject, rut: unformatRut(subject.rut) };
+        const { error } = await supabase.from('subjects').update(subjectToUpdate).eq('id', subject.id);
+        if (error) throw error;
+        await refreshTable('subjects');
     };
-
-    const addEmployee = async (employee: Omit<Employee, 'id' | 'company_id'>) => {
-        if (!activeCompany) {
-            handleApiError({ message: 'No hay una empresa activa' }, 'al agregar empleado');
-            return;
-        }
-        try {
-            const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
-            const { error } = await supabase.from('employees').insert(newEmployee);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empleado agregado correctamente.' });
-            await refreshTable('employees');
-        } catch (error: any) {
-            handleApiError(error, 'al agregar el empleado');
-        }
+    
+    const deleteSubject = async (id) => {
+        const { error } = await supabase.from('subjects').delete().eq('id', id);
+        if (error) throw error;
+        await refreshTable('subjects');
     };
-
-    const updateEmployee = async (employee: Employee) => {
-        try {
-            const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
-            const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empleado actualizado correctamente.' });
-            await refreshTable('employees');
-        } catch (error: any) {
-            handleApiError(error, 'al actualizar el empleado');
-        }
+    
+    // Employee Management
+    const addEmployee = async (employee) => {
+        if (!activeCompany) throw new Error('No hay una empresa activa');
+        const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+        const { error } = await supabase.from('employees').insert(newEmployee);
+        if (error) throw error;
+        await refreshTable('employees');
     };
-
-    const deleteEmployee = async (id: number) => {
-        try {
-            const { error } = await supabase.from('employees').delete().eq('id', id);
-            if (error) throw error;
-            addNotification({ type: 'success', message: 'Empleado eliminado correctamente.' });
-            await refreshTable('employees');
-        } catch (error: any) {
-            handleApiError(error, 'al eliminar el empleado');
-        }
+    
+    const updateEmployee = async (employee) => {
+        const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
+        const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
+        if (error) throw error;
+        await refreshTable('employees');
     };
-
+    
+    const deleteEmployee = async (id) => {
+        const { error } = await supabase.from('employees').delete().eq('id', id);
+        if (error) throw error;
+        await refreshTable('employees');
+    };
 
     return (
         <SessionContext.Provider value={{
             currentUser, companies, chartOfAccounts, subjects, costCenters, items, employees,
             institutions, monthlyParameters, vouchers, invoices, feeInvoices, warehouseMovements,
-            payslips, bankReconciliations, users, accountGroups, familyAllowances, activeCompany, activeCompanyId: activeCompany?.id || null,
-            activePeriod, periods, isLoading, notifications, login, logout, addNotification,
-            switchCompany, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
+            payslips, users, accountGroups, familyAllowanceBrackets, incomeTaxBrackets, activeCompany,
+            activeCompanyId, activePeriod, periods, isLoading, notifications, login, logout, addNotification,
+            setActiveCompanyId, setActivePeriod, sendPasswordResetEmail, fetchDataForCompany, refreshTable,
             addUser, updateUser, deleteUser, handleApiError, addCompany, updateCompany, deleteCompany,
             addSubject, updateSubject, deleteSubject, addEmployee, updateEmployee, deleteEmployee
         }}>
