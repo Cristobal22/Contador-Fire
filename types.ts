@@ -64,7 +64,7 @@ export type User = {
 };
 export type UserData = Omit<User, 'id'>;
 
-export type Institution = { id: number; name: string; type: 'AFP' | 'Isapre' | 'Fonasa' | 'Otro'; rate?: number; };
+export type Institution = { id: number; name: string; type: 'AFP' | 'Isapre' | 'Fonasa' | 'Otro'; rate?: number; previred_code?: string; dt_code?: string;};
 export type InstitutionData = Omit<Institution, 'id'>;
 
 export type MonthlyParameter = { id: number; period: string; name: 'UF' | 'UTM' | 'IPC' | 'Tope Imponible'; value: number; };
