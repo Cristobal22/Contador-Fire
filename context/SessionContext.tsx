@@ -424,26 +424,33 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
     
     // Employee Management
-    const addEmployee = async (employee:any) => {
+    const addEmployee = async (employee: any) => {
         if (!activeCompany) throw new Error('No hay una empresa activa');
-        const newEmployee = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
-        console.log('Adding Employee:', newEmployee);
-        if (newEmployee.afpld) {
-            newEmployee.afpId = newEmployee.afpld;
-            delete newEmployee.afpld;
+        
+        const employeeToSave = { ...employee, rut: unformatRut(employee.rut), company_id: activeCompany.id };
+        
+        if (employeeToSave.hasOwnProperty('afpld')) {
+            employeeToSave.afpId = employeeToSave.afpld;
+            delete employeeToSave.afpld;
         }
-        const { error } = await supabase.from('employees').insert(newEmployee);
+
+        console.log('Attempting to save employee:', employeeToSave);
+
+        const { error } = await supabase.from('employees').insert(employeeToSave);
         if (error) throw error;
         await refreshTable('employees');
     };
-    
-    const updateEmployee = async (employee:any) => {
+
+    const updateEmployee = async (employee: any) => {
         const employeeToUpdate = { ...employee, rut: unformatRut(employee.rut) };
-        console.log('Updating Employee:', employeeToUpdate);
-        if (employeeToUpdate.afpld) {
+        
+        if (employeeToUpdate.hasOwnProperty('afpld')) {
             employeeToUpdate.afpId = employeeToUpdate.afpld;
             delete employeeToUpdate.afpld;
         }
+
+        console.log('Attempting to update employee:', employeeToUpdate);
+
         const { error } = await supabase.from('employees').update(employeeToUpdate).eq('id', employee.id);
         if (error) throw error;
         await refreshTable('employees');
