@@ -133,7 +133,7 @@ export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; ini
                                 <td className="col-account">
                                     <select value={entry.accountId} onChange={e => handleAccountChange(index, e.target.value)} required>
                                         <option value="" disabled>Seleccione...</option>
-                                        {accounts.sort((a,b) => a.code.localeCompare(b.code)).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                        {(accounts || []).sort((a,b) => a.code.localeCompare(b.code)).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                     </select>
                                 </td>
                                 <td className="col-amount">
@@ -173,7 +173,7 @@ export const InvoiceForm: React.FC<{ onSave: (invoice: InvoiceData) => void; typ
             <div className="modal-body">
                 <div className="form-group"><label htmlFor="date">Fecha</label><input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required /></div>
                 <div className="form-group"><label htmlFor="invoiceNumber">Número Factura</label><input type="text" id="invoiceNumber" name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="subjectId">{subjectType}</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{subjects.filter(s => s.type === subjectType).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                <div className="form-group"><label htmlFor="subjectId">{subjectType}</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{(subjects || []).filter(s => s.type === subjectType).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                 <div style={{display: 'flex', gap: '16px'}}><div className="form-group"><label htmlFor="net">Neto</label><input type="number" id="net" name="net" value={formData.net} onChange={handleChange} required /></div><div className="form-group"><label>IVA (19%)</label><input type="text" value={tax.toLocaleString('es-CL')} readOnly /></div><div className="form-group"><label>Total</label><input type="text" value={total.toLocaleString('es-CL')} readOnly /></div></div>
             </div>
             <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button><SaveButton isLoading={isLoading} /></div>
@@ -197,7 +197,7 @@ export const FeeInvoiceForm: React.FC<{ onSave: (invoice: FeeInvoiceData) => voi
             <div className="modal-body">
                 <div className="form-group"><label htmlFor="date">Fecha</label><input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required /></div>
                 <div className="form-group"><label htmlFor="invoiceNumber">Número Boleta</label><input type="text" id="invoiceNumber" name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="subjectId">Proveedor</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{subjects.filter(s => s.type === 'Proveedor').map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                <div className="form-group"><label htmlFor="subjectId">Proveedor</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{(subjects || []).filter(s => s.type === 'Proveedor').map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                 <div style={{display: 'flex', gap: '16px'}}>
                    <div className="form-group"><label htmlFor="grossAmount">Monto Bruto</label><input type="number" id="grossAmount" name="grossAmount" value={formData.grossAmount} onChange={handleChange} required /></div>
                    <div className="form-group"><label>Retención ({TAX_RETENTION_RATE * 100}%)</label><input type="text" value={taxRetention.toLocaleString('es-CL')} readOnly /></div>
