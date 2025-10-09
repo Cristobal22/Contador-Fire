@@ -57,7 +57,7 @@ const BalanceSheetView = () => {
     const reportData = useMemo(() => {
         const accountBalances = new Map<number, number>();
 
-        vouchers.forEach(voucher => {
+        (vouchers || []).forEach(voucher => {
             voucher.entries.forEach(entry => {
                 if (entry.accountId === '') return;
                 const currentBalance = accountBalances.get(entry.accountId) || 0;
@@ -65,22 +65,22 @@ const BalanceSheetView = () => {
             });
         });
 
-        const assets = accounts
+        const assets = (accounts || [])
             .filter(a => a.type === 'Activo' && accountBalances.has(a.id))
             .map(a => ({ name: a.name, balance: accountBalances.get(a.id)! }))
             .filter(a => a.balance !== 0);
             
-        const liabilities = accounts
+        const liabilities = (accounts || [])
             .filter(a => a.type === 'Pasivo' && accountBalances.has(a.id))
             .map(a => ({ name: a.name, balance: -accountBalances.get(a.id)! })) // Liabilities have credit balance (negative), shown as positive
             .filter(l => l.balance !== 0);
 
-        const equity = accounts
+        const equity = (accounts || [])
             .filter(a => a.type === 'Patrimonio' && accountBalances.has(a.id))
             .map(a => ({ name: a.name, balance: -accountBalances.get(a.id)! }))
              .filter(e => e.balance !== 0);
 
-        const netIncome = accounts
+        const netIncome = (accounts || [])
             .filter(a => a.type === 'Resultado' && accountBalances.has(a.id))
             .reduce((sum, a) => sum - accountBalances.get(a.id)!, 0); // Income (credit) is negative, expenses (debit) are positive. Invert sign for result.
 
