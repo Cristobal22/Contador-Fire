@@ -62,20 +62,25 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
     const handleSave = async (formData: T | Omit<T, 'id'>) => {
         setIsLoading(true);
         const isEditing = editingItem && 'id' in editingItem;
-        
-        if ('rut' in formData && typeof (formData as any).rut === 'string' && (formData as any).rut) {
-            if (!validateRut((formData as any).rut)) {
+        const dataToSave = { ...formData };
+        if ('rut' in dataToSave && typeof (dataToSave as any).rut === 'string' && (dataToSave as any).rut) {
+            if (!validateRut((dataToSave as any).rut)) {
                 addNotification({ type: 'error', message: 'El RUT ingresado no es válido. Verifique el RUT y el dígito verificador.' });
                 setIsLoading(false);
                 return;
             }
         }
 
+        if ((dataToSave as any).afpld) {
+            (dataToSave as any).afpId = (dataToSave as any).afpld;
+            delete (dataToSave as any).afpld;
+        }
+        
         try {
             if (isEditing) {
-                await onUpdate(formData as T);
+                await onUpdate(dataToSave as T);
             } else {
-                await onSave(formData as Omit<T, 'id'>);
+                await onSave(dataToSave as Omit<T, 'id'>);
             }
             addNotification({ type: 'success', message: `Registro ${isEditing ? 'actualizado' : 'guardado'} con éxito.` });
             setIsModalOpen(false);
