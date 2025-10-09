@@ -237,7 +237,7 @@ export const CompanySettingsView: React.FC = () => {
                         {renderAccountInput('Clientes Honorarios', 'client_fees_account', 'HONORARIOS POR COBRAR')}
                         {renderAccountInput('Retenciones por Pagar', 'retentions_to_pay_account', 'RETENCION INGRESO HONORARIO')}
                         {renderAccountInput('Retenciones por Cobrar', 'retentions_to_collect_account', 'RETENCION HONORARIO POR COBRAR')}
-                    </AccountG>
+                    </AccountGroup>
                     <AccountGroup title="Flujo Efectivo" isOpen={openAccordion === 'Flujo Efectivo'} onToggle={() => handleAccordionToggle('Flujo Efectivo')}>
                         {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account', 'EFECTIVO Y EQUIVALENTE')}
                         {renderAccountInput('Cuenta Retiro Socio', 'partner_withdrawal_account', 'CUENTAS CORRIENTES DE SOCIOS')}
