@@ -40,33 +40,30 @@ interface AccountGroupProps {
 }
 
 const AccountGroup: React.FC<AccountGroupProps> = ({ title, children, isOpen, onToggle }) => (
-    <div className="accordion-item">
-        <h2 className="accordion-header" id={`heading-${title.replace(/\s+/g, '-')}`}>
-            <button 
-                className={`accordion-button ${!isOpen ? 'collapsed' : ''}`} 
-                type="button" 
-                onClick={onToggle}
-            >
-                {title}
-            </button>
-        </h2>
-        <div 
-            id={`collapse-${title.replace(/\s+/g, '-')}`}
-            className={`accordion-collapse collapse ${isOpen ? 'show' : ''}`}
-            aria-labelledby={`heading-${title.replace(/\s+/g, '-')}`}
+    <div className="mb-3">
+        <h5 
+            onClick={onToggle} 
+            style={{ cursor: 'pointer', marginBottom: '1rem', userSelect: 'none' }}
+            className="d-flex justify-content-between align-items-center"
+            aria-expanded={isOpen}
         >
-            <div className="accordion-body">
+            {title}
+            <span className="material-symbols-outlined">
+                {isOpen ? 'expand_less' : 'expand_more'}
+            </span>
+        </h5>
+        {isOpen && (
+            <div className="card card-body">
                 {children}
             </div>
-        </div>
+        )}
     </div>
 );
-
 
 export const CompanySettingsView: React.FC = () => {
     const { companyId } = useParams<{ companyId: string }>();
     const navigate = useNavigate();
-    const { companies, updateCompany, addNotification, handleApiError } = useSession();
+    const { companies, accounts, updateCompany, addNotification, handleApiError } = useSession();
     
     const [company, setCompany] = useState<Company | null>(null);
     const [formData, setFormData] = useState<Partial<Company>>(initialFormData);
@@ -100,7 +97,6 @@ export const CompanySettingsView: React.FC = () => {
         try {
             await updateCompany(company.id, formData);
             addNotification({ type: 'success', message: 'Configuración guardada correctamente.' });
-            // Optionally refetch company data if context doesn't auto-update
         } catch (error: any) {
             handleApiError(error, 'al guardar la configuración');
         } finally {
@@ -111,31 +107,37 @@ export const CompanySettingsView: React.FC = () => {
     const handleCancel = () => {
         if (company) {
             setFormData({ ...initialFormData, ...company });
-            addNotification({ type: 'success', message: 'Cambios cancelados.' });
+            addNotification({ type: 'info', message: 'Cambios cancelados.' });
         }
     };
     
-    const renderAccountInput = (label: string, name: keyof Company, accountName: string) => (
-        <div className="row mb-3 align-items-center">
-            <label className="col-lg-3 col-form-label">{label}:</label>
-            <div className="col-lg-9">
-                <div className="input-group">
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        name={name} 
-                        value={formData[name] as string || ''} 
-                        onChange={handleInputChange}
-                        style={{ flex: '0 0 120px' }}
-                    />
-                    <button className="btn btn-outline-secondary d-flex align-items-center" type="button">
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>search</span>
-                    </button>
-                    <input type="text" className="form-control bg-light" readOnly value={accountName} />
+    const renderAccountInput = (label: string, name: keyof Company) => {
+        const accountCode = formData[name] as string || '';
+        const account = accounts ? accounts.find(acc => acc.code === accountCode) : null;
+        const accountName = account ? account.name : '';
+
+        return (
+            <div className="row mb-3 align-items-center">
+                <label className="col-lg-3 col-form-label">{label}:</label>
+                <div className="col-lg-9">
+                    <div className="input-group">
+                        <input 
+                            type="text" 
+                            className="form-control" 
+                            name={name} 
+                            value={accountCode} 
+                            onChange={handleInputChange}
+                            style={{ flex: '0 0 120px' }}
+                        />
+                        <button className="btn btn-outline-secondary d-flex align-items-center" type="button">
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>search</span>
+                        </button>
+                        <input type="text" className="form-control bg-light" readOnly value={accountName} />
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     if (!company) {
         return <div className="container mt-4"><h2>Cargando configuración...</h2></div>;
@@ -208,39 +210,39 @@ export const CompanySettingsView: React.FC = () => {
                 <hr className="my-4" />
 
                 <h5 className="mb-3">Cuentas Contables</h5>
-                <div className="accordion" id="accounts-accordion">
+                <div>
                     <AccountGroup title="Resultados" isOpen={openAccordion === 'Resultados'} onToggle={() => handleAccordionToggle('Resultados')}>
-                        {renderAccountInput('Cuenta de Ganancia', 'profit_account', 'PERDIDAS Y GANANCIAS EJERCICIO')}
-                        {renderAccountInput('Cuenta de Pérdida', 'loss_account', 'PERDIDAS Y GANANCIAS EJERCICIO')}
+                        {renderAccountInput('Cuenta de Ganancia', 'profit_account')}
+                        {renderAccountInput('Cuenta de Pérdida', 'loss_account')}
                     </AccountGroup>
 
                     <AccountGroup title="Ventas" isOpen={openAccordion === 'Ventas'} onToggle={() => handleAccordionToggle('Ventas')}>
-                        {renderAccountInput('Facturas por Cobrar', 'invoices_to_collect_account', 'CLIENTES')}
-                        {renderAccountInput('Boletas por Cobrar', 'bills_to_collect_account', 'CLIENTES')}
-                        {renderAccountInput('Cuenta de IVA Débito', 'vat_account', 'IVA DEBITO FISCAL')}
-                        {renderAccountInput('Otros Impuestos', 'other_taxes_account', 'OTROS IMPUESTOS')}
+                        {renderAccountInput('Facturas por Cobrar', 'invoices_to_collect_account')}
+                        {renderAccountInput('Boletas por Cobrar', 'bills_to_collect_account')}
+                        {renderAccountInput('Cuenta de IVA Débito', 'vat_account')}
+                        {renderAccountInput('Otros Impuestos', 'other_taxes_account')}
                     </AccountGroup>
 
                     <AccountGroup title="Compras" isOpen={openAccordion === 'Compras'} onToggle={() => handleAccordionToggle('Compras')}>
-                        {renderAccountInput('Facturas por Pagar', 'invoices_to_pay_account', 'PROVEEDORES')}
-                        {renderAccountInput('Boletas por Pagar', 'bills_to_pay_account', 'PROVEEDORES')}
-                        {renderAccountInput('Cuenta de IVA Crédito', 'vat_credit_account', 'IVA CREDITO FISCAL')}
-                        {renderAccountInput('Otros Impuestos por Pagar', 'other_taxes_to_pay_account', 'OTROS IMPUESTOS')}
+                        {renderAccountInput('Facturas por Pagar', 'invoices_to_pay_account')}
+                        {renderAccountInput('Boletas por Pagar', 'bills_to_pay_account')}
+                        {renderAccountInput('Cuenta de IVA Crédito', 'vat_credit_account')}
+                        {renderAccountInput('Otros Impuestos por Pagar', 'other_taxes_to_pay_account')}
                     </AccountGroup>
 
                     <AccountGroup title="Honorarios" isOpen={openAccordion === 'Honorarios'} onToggle={() => handleAccordionToggle('Honorarios')}>
-                        {renderAccountInput('Honorarios por Pagar', 'fees_to_pay_account', 'HONORARIOS POR PAGAR')}
-                        {renderAccountInput('Retenciones 2da Categoría', 'second_category_retentions_account', 'RETENCION IMPUESTO HONORARIOS')}
+                        {renderAccountInput('Honorarios por Pagar', 'fees_to_pay_account')}
+                        {renderAccountInput('Retenciones 2da Categoría', 'second_category_retentions_account')}
                     </AccountGroup>
                     
                     <AccountGroup title="Ingresos Honorarios" isOpen={openAccordion === 'Ingresos Honorarios'} onToggle={() => handleAccordionToggle('Ingresos Honorarios')}>
-                        {renderAccountInput('Clientes Honorarios', 'client_fees_account', 'HONORARIOS POR COBRAR')}
-                        {renderAccountInput('Retenciones por Pagar', 'retentions_to_pay_account', 'RETENCION INGRESO HONORARIO')}
-                        {renderAccountInput('Retenciones por Cobrar', 'retentions_to_collect_account', 'RETENCION HONORARIO POR COBRAR')}
+                        {renderAccountInput('Clientes Honorarios', 'client_fees_account')}
+                        {renderAccountInput('Retenciones por Pagar', 'retentions_to_pay_account')}
+                        {renderAccountInput('Retenciones por Cobrar', 'retentions_to_collect_account')}
                     </AccountGroup>
                     <AccountGroup title="Flujo Efectivo" isOpen={openAccordion === 'Flujo Efectivo'} onToggle={() => handleAccordionToggle('Flujo Efectivo')}>
-                        {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account', 'EFECTIVO Y EQUIVALENTE')}
-                        {renderAccountInput('Cuenta Retiro Socio', 'partner_withdrawal_account', 'CUENTAS CORRIENTES DE SOCIOS')}
+                        {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account')}
+                        {renderAccountInput('Cuenta Retiro Socio', 'partner_withdrawal_account')}
                     </AccountGroup>
                 </div>
                 
