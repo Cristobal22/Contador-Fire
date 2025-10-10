@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Employee, EmployeeData, Institution, CostCenter } from '../types';
 import { formatRut, parseRut } from '../utils/format';
+import { regions } from '../data/geography';
 
 type EmployeeFormProps = {
     onSave: (employee: EmployeeData) => void;
@@ -67,10 +68,20 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
     };
     
     const [formData, setFormData] = useState<EmployeeData>(getInitialFormData(initialData));
+    const [communeOptions, setCommuneOptions] = useState<string[]>([]);
 
     useEffect(() => {
         setFormData(getInitialFormData(initialData));
     }, [initialData]);
+
+    useEffect(() => {
+        if (formData.region) {
+            const selectedRegion = regions.find(r => r.name === formData.region);
+            setCommuneOptions(selectedRegion ? selectedRegion.communes : []);
+        } else {
+            setCommuneOptions([]);
+        }
+    }, [formData.region]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -207,8 +218,20 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>Movilización Mensual</label><input type="number" name="monthly_transport_allowance" value={formData.monthly_transport_allowance || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Movilización Diaria</label><input type="number" name="daily_transport_allowance" value={formData.daily_transport_allowance || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Tipo de Jornada</label><select name="workday_type" value={formData.workday_type || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
-                        <div className="form-group"><label>Región</label><select name="region" value={formData.region || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
-                        <div className="form-group"><label>Comuna</label><select name="contract_commune" value={formData.contract_commune || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
+                        <div className="form-group">
+                            <label>Región</label>
+                            <select name="region" value={formData.region || ''} onChange={handleChange}>
+                                <option value="">Seleccione una región</option>
+                                {regions.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Comuna</label>
+                            <select name="contract_commune" value={formData.contract_commune || ''} onChange={handleChange} disabled={!formData.region}>
+                                <option value="">Seleccione una comuna</option>
+                                {communeOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group grid-col-span-3-align-right"><button type="button" className="btn btn-secondary">Copiar región a todos los trabajadores</button></div>
                     </div>
                 </FormSection>
