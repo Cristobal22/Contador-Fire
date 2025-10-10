@@ -92,15 +92,15 @@ const NavMenu: React.FC<any> = ({ data, openMenus, toggleMenu, level = 0, urlPar
 
 // Componente principal de la barra lateral
 export const Sidebar = ({ navStructure }: { navStructure: NavStructure }) => {
-    const { currentUser, companies, activeCompany, switchCompany, addNotification } = useSession();
+    const { currentUser, companies, activeCompany, setActiveCompanyId, addNotification } = useSession();
     const { openMenus, toggleMenu } = useMenuState(navStructure);
 
     if (!currentUser) return null;
 
     const handleCompanyChange = (event: ChangeEvent<HTMLSelectElement>) => {
         const newCompanyId = Number(event.target.value);
-        if (switchCompany) {
-            switchCompany(newCompanyId);
+        if (setActiveCompanyId) {
+            setActiveCompanyId(newCompanyId);
             const selectedCompany = companies.find(c => c.id === newCompanyId);
             addNotification({ type: 'success', message: `Empresa cambiada a: ${selectedCompany?.name}` });
         }
