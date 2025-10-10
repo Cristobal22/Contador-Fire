@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Employee, EmployeeData, Institution, CostCenter } from '../types';
 import { formatRut, parseRut } from '../utils/format';
 import { regions } from '../data/geography';
+import { contractTypes, workdayTypes, paymentTypes, taxTypes, apvPaymentMethods, workerTypes } from '../data/payroll';
 
 type EmployeeFormProps = {
     onSave: (employee: EmployeeData) => void;
@@ -54,9 +55,20 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
             business_salary: 0,
             healthId: 0,
             afpId: 0,
+            compensation_fund_id: 0,
+            second_compensation_fund_id: 0,
             hireDate: new Date().toISOString().split('T')[0],
             weekly_hours: 44,
             has_unemployment_insurance: false,
+            compensation_fund_branch: '',
+            payment_type: 'DEPOSITO',
+            fixed_term_period_from: '',
+            fixed_term_period_to: '',
+            worker_type: 'ACTIVO',
+            apv_payment_method: 'PLANILLA',
+            apv2_payment_method: 'PLANILLA',
+            apvc_payment_method: 'PLANILLA',
+            tax_type: 'AFECTO',
         };
         if (!data) return defaults;
         
@@ -115,6 +127,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
     const afpOptions = institutions.filter(i => i.type === 'AFP').map(i => ({ value: i.id, label: i.name }));
     const healthOptions = institutions.filter(i => i.type === 'Isapre' || i.type === 'Fonasa').map(i => ({ value: i.id, label: i.name }));
     const bankOptions = institutions.filter(i => i.type === 'Banco').map(i => ({ value: i.id, label: i.name }));
+    const ccafOptions = institutions.filter(i => i.type === 'CCAF').map(i => ({ value: i.id, label: i.name }));
     const costCenterOptions = costCenters.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }));
 
 
@@ -158,7 +171,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>Cotización Salud Pesos</label><input type="number" name="health_contribution_pesos" value={formData.health_contribution_pesos || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>% Salud Colectivo</label><input type="number" name="collective_health_percentage" value={formData.collective_health_percentage || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>AFP</label><select name="afpId" value={formData.afpId} onChange={handleChange}>{afpOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                        <div className="form-group"><label>Tipo Trabajador</label><input name="worker_type" value={formData.worker_type || ''} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>Tipo Trabajador</label>
+                            <select name="worker_type" value={formData.worker_type || ''} onChange={handleChange}>
+                                <option value="">Seleccione</option>
+                                {workerTypes.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Cuenta 2 AFP</label><input type="number" name="afp_account_2" value={formData.afp_account_2 || 0} onChange={handleChange} /></div>
                         <div className="form-group">
                             <label>Seguro de Cesantía Trabajador</label>
@@ -172,9 +191,21 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>APV</label><input type="number" name="apv_amount" value={formData.apv_amount || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>APV UF</label><input type="number" name="apv_amount_uf" value={formData.apv_amount_uf || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Empresa APV</label><select name="apv_provider_id" value={formData.apv_provider_id || ''} onChange={handleChange}><option value="">Seleccione...</option>{afpOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                        <div className="form-group"><label>Forma de Pago APV</label><select name="apv_payment_method" value={formData.apv_payment_method || ''} onChange={handleChange}><option value="">Seleccione...</option><option>1.- Directa a la institución</option></select></div>
+                        <div className="form-group">
+                            <label>Forma de Pago APV</label>
+                            <select name="apv_payment_method" value={formData.apv_payment_method || ''} onChange={handleChange}>
+                                <option value="">Seleccione...</option>
+                                {apvPaymentMethods.map(m => <option key={m.code} value={m.code}>{m.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Reg. Letra</label><select name="apv_regime_letter" value={formData.apv_regime_letter || 'B'} onChange={handleChange}><option value="A">A</option><option value="B">B</option></select></div>
-                        <div className="form-group"><label>Tipo de Impuesto</label><select name="tax_type" value={formData.tax_type || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
+                        <div className="form-group">
+                            <label>Tipo de Impuesto</label>
+                            <select name="tax_type" value={formData.tax_type || ''} onChange={handleChange}>
+                                <option value="">Seleccione</option>
+                                {taxTypes.map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group">
                             <label>Trabajador Agrícola</label>
                             <select name="is_agricultural_worker" value={formData.is_agricultural_worker ? 'true' : 'false'} onChange={handleChange}>
@@ -186,16 +217,41 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>APV2</label><input type="number" name="apv2_amount_uf" value={formData.apv2_amount_uf || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Empresa APV2</label><select name="apv2_provider_id" value={formData.apv2_provider_id || ''} onChange={handleChange}><option value="">Seleccione...</option>{afpOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                         <div className="form-group"><label>Empresa APV Colectivo</label><input type="number" name="collective_apv_amount" value={formData.collective_apv_amount || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Forma de Pago APV2</label><select name="apv2_payment_method" value={formData.apv2_payment_method || ''} onChange={handleChange}><option value="">Seleccione...</option><option>1.- Directa a la institución</option></select></div>
+                        <div className="form-group">
+                            <label>Forma de Pago APV2</label>
+                            <select name="apv2_payment_method" value={formData.apv2_payment_method || ''} onChange={handleChange}>
+                                <option value="">Seleccione...</option>
+                                {apvPaymentMethods.map(m => <option key={m.code} value={m.code}>{m.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Reg. Letra</label><input value="B" readOnly /></div>
                         <div className="form-group"><label>APV Colectivo</label><input type="number" name="collective_apv_amount" value={formData.collective_apv_amount || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Forma de Pago APVC</label><select name="apvc_payment_method" value={formData.apvc_payment_method || ''} onChange={handleChange}><option value="">Seleccione...</option></select></div>
+                        <div className="form-group">
+                            <label>Forma de Pago APVC</label>
+                            <select name="apvc_payment_method" value={formData.apvc_payment_method || ''} onChange={handleChange}>
+                                <option value="">Seleccione...</option>
+                                {apvPaymentMethods.map(m => <option key={m.code} value={m.code}>{m.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Reg. Letra</label><input value="B" readOnly /></div>
                         <div className="form-group"><label>APV Colectivo UF</label><input type="number" name="collective_apv_amount_uf" value={formData.collective_apv_amount_uf || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>% Trabajador APVC</label><input type="number" name="apvc_worker_percentage" value={formData.apvc_worker_percentage || 0} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>Caja de Compensación</label>
+                            <select name="compensation_fund_id" value={formData.compensation_fund_id || ''} onChange={handleChange}>
+                                <option value="">Seleccione...</option>
+                                {ccafOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Préstamo Caja</label><input type="number" name="caja_loan" value={formData.caja_loan || 0} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>2nda Caja de Compensación</label>
+                            <select name="second_compensation_fund_id" value={formData.second_compensation_fund_id || ''} onChange={handleChange}>
+                                <option value="">Seleccione...</option>
+                                {ccafOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Préstamo 2da Caja</label><input type="number" name="caja_loan_2" value={formData.caja_loan_2 || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>2nda Caja de Compensación</label><input name="second_caja" value={formData.second_caja || ''} onChange={handleChange} /></div>
                         <div className="form-group">
                             <label>Seguro de Accidente</label>
                             <select name="has_accident_insurance" value={formData.has_accident_insurance ? 'true' : 'false'} onChange={handleChange}>
@@ -212,12 +268,24 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                      <div className="grid-col-3">
                         <div className="form-group"><label>Fecha Contrato (dd/mm/aaaa)</label><input type="date" name="hireDate" value={formData.hireDate} onChange={handleChange} /></div>
                         <div className="form-group"><label>Fecha Término Contrato</label><input type="date" name="contract_end_date" value={formData.contract_end_date || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Cláusula de Término</label><select name="termination_clause" value={formData.termination_clause || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
+                        <div className="form-group">
+                            <label>Cláusula de Término</label>
+                            <select name="termination_clause" value={formData.termination_clause || ''} onChange={handleChange}>
+                                <option value="">Seleccione</option>
+                                {contractTypes.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Colación Mensual</label><input type="number" name="monthly_meal_allowance" value={formData.monthly_meal_allowance || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Colación Diaria</label><input type="number" name="daily_meal_allowance" value={formData.daily_meal_allowance || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Movilización Mensual</label><input type="number" name="monthly_transport_allowance" value={formData.monthly_transport_allowance || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Movilización Diaria</label><input type="number" name="daily_transport_allowance" value={formData.daily_transport_allowance || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Tipo de Jornada</label><select name="workday_type" value={formData.workday_type || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
+                        <div className="form-group">
+                            <label>Tipo de Jornada</label>
+                            <select name="workday_type" value={formData.workday_type || ''} onChange={handleChange}>
+                                <option value="">Seleccione</option>
+                                {workdayTypes.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group">
                             <label>Región</label>
                             <select name="region" value={formData.region || ''} onChange={handleChange}>
@@ -232,6 +300,16 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                                 {communeOptions.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
+                        <div className="form-group"><label>Sucursal (Caja)</label><input name="compensation_fund_branch" value={formData.compensation_fund_branch || ''} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>Tipo de Pago</label>
+                            <select name="payment_type" value={formData.payment_type || ''} onChange={handleChange}>
+                                <option value="">Seleccione</option>
+                                {paymentTypes.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group"><label>Período Desde</label><input type="date" name="fixed_term_period_from" value={formData.fixed_term_period_from || ''} onChange={handleChange} /></div>
+                        <div className="form-group"><label>Período Hasta</label><input type="date" name="fixed_term_period_to" value={formData.fixed_term_period_to || ''} onChange={handleChange} /></div>
                         <div className="form-group grid-col-span-3-align-right"><button type="button" className="btn btn-secondary">Copiar región a todos los trabajadores</button></div>
                     </div>
                 </FormSection>
