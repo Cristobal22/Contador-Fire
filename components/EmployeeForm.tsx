@@ -99,6 +99,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
     const afpOptions = institutions.filter(i => i.type === 'AFP').map(i => ({ value: i.id, label: i.name }));
     const healthOptions = institutions.filter(i => i.type === 'Isapre' || i.type === 'Fonasa').map(i => ({ value: i.id, label: i.name }));
     const bankOptions = institutions.filter(i => i.type === 'Banco').map(i => ({ value: i.id, label: i.name }));
+    const costCenterOptions = costCenters.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }));
 
 
     return (
@@ -107,8 +108,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                 <FormSection title="Datos Personales">
                     <div className="grid-col-3">
                         <div className="form-group"><label>Rut</label><input name="rut" value={formData.rut} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Centro de Costo Código</label><input name="cost_center_code" value={formData.cost_center_code || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Centro de Costo Nombre</label><input value={costCenters.find(c => c.code === formData.cost_center_code)?.name || ''} readOnly /></div>
+                        <div className="form-group"><label>Centro de Costo</label><select name="cost_center_code" value={formData.cost_center_code || ''} onChange={handleChange}><option value="">Seleccione...</option>{costCenterOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                         <div className="form-group"><label>Nombre</label><input name="name" value={formData.name} onChange={handleChange} /></div>
                         <div className="form-group"><label>Apellido Paterno</label><input name="paternal_lastname" value={formData.paternal_lastname || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Apellido Materno</label><input name="maternal_lastname" value={formData.maternal_lastname || ''} onChange={handleChange} /></div>
