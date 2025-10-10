@@ -55,10 +55,10 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
             afpId: 0,
             hireDate: new Date().toISOString().split('T')[0],
             weekly_hours: 44,
+            has_unemployment_insurance: false,
         };
         if (!data) return defaults;
         
-        // Ensure all keys from the images are present, even if undefined in the data
         return {
             ...defaults,
             ...data,
@@ -76,13 +76,18 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
         const { name, value, type } = e.target;
         
         let processedValue: any = value;
-        if (type === 'number') {
+
+        if (type === 'checkbox') {
+            processedValue = (e.target as HTMLInputElement).checked;
+        } else if (type === 'number') {
             processedValue = value === '' ? null : parseFloat(value);
         } else if (name === 'rut') {
             processedValue = formatRut(value);
+        } else if (value === 'true' || value === 'false') {
+            processedValue = value === 'true';
         } else if (e.target.nodeName === 'SELECT' && (e.target as HTMLSelectElement).multiple === false) {
              const numericValue = Number(value);
-             if (!isNaN(numericValue)) {
+             if (!isNaN(numericValue) && value.trim() !== '') {
                 processedValue = numericValue;
              }
         }
@@ -144,7 +149,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>AFP</label><select name="afpId" value={formData.afpId} onChange={handleChange}>{afpOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                         <div className="form-group"><label>Tipo Trabajador</label><input name="worker_type" value={formData.worker_type || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Cuenta 2 AFP</label><input type="number" name="afp_account_2" value={formData.afp_account_2 || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Seguro de Cesantía Trabajador</label><input name="unemployment_insurance" value={formData.unemployment_insurance ? 'Sí' : 'No'} readOnly /></div>
+                        <div className="form-group">
+                            <label>Seguro de Cesantía Trabajador</label>
+                            <select name="has_unemployment_insurance" value={formData.has_unemployment_insurance ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Seguro de Cesantía Empleador</label><button type="button" className="btn">Seguro AFC</button></div>
                         <div className="form-group"><label>Número de Cargas</label><input type="number" name="family_dependents" value={formData.family_dependents || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>APV</label><input type="number" name="apv_amount" value={formData.apv_amount || 0} onChange={handleChange} /></div>
@@ -153,7 +164,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>Forma de Pago APV</label><select name="apv_payment_method" value={formData.apv_payment_method || ''} onChange={handleChange}><option value="">Seleccione...</option><option>1.- Directa a la institución</option></select></div>
                         <div className="form-group"><label>Reg. Letra</label><select name="apv_regime_letter" value={formData.apv_regime_letter || 'B'} onChange={handleChange}><option value="A">A</option><option value="B">B</option></select></div>
                         <div className="form-group"><label>Tipo de Impuesto</label><select name="tax_type" value={formData.tax_type || ''} onChange={handleChange}><option value="">Seleccione</option></select></div>
-                        <div className="form-group"><label>Trabajador Agrícola</label><input name="is_agricultural_worker" value={formData.is_agricultural_worker ? 'Sí' : 'No'} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>Trabajador Agrícola</label>
+                            <select name="is_agricultural_worker" value={formData.is_agricultural_worker ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Préstamo Solidario</label><input type="number" name="solidarity_loan" value={formData.solidarity_loan || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>APV2</label><input type="number" name="apv2_amount_uf" value={formData.apv2_amount_uf || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Empresa APV2</label><select name="apv2_provider_id" value={formData.apv2_provider_id || ''} onChange={handleChange}><option value="">Seleccione...</option>{afpOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
@@ -168,9 +185,15 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>Préstamo Caja</label><input type="number" name="caja_loan" value={formData.caja_loan || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Préstamo 2da Caja</label><input type="number" name="caja_loan_2" value={formData.caja_loan_2 || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>2nda Caja de Compensación</label><input name="second_caja" value={formData.second_caja || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Seguro de Accidente</label><select name="has_accident_insurance" value={formData.has_accident_insurance ? 'SI' : 'NO'} onChange={handleChange}><option value="SI">SI</option><option value="NO">NO</option></select></div>
+                        <div className="form-group">
+                            <label>Seguro de Accidente</label>
+                            <select name="has_accident_insurance" value={formData.has_accident_insurance ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">SI</option>
+                                <option value="false">NO</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Fecha de Primera Afiliación a Entidad Previsional</label><input type="date" name="first_pension_affiliation_date" value={formData.first_pension_affiliation_date || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Afiliado Voluntario</label><input type="checkbox" name="is_voluntary_affiliate" checked={formData.is_voluntary_affiliate || false} onChange={e => setFormData(prev => ({...prev, is_voluntary_affiliate: e.target.checked}))} /></div>
+                        <div className="form-group"><label>Afiliado Voluntario</label><input type="checkbox" name="is_voluntary_affiliate" checked={formData.is_voluntary_affiliate || false} onChange={handleChange} /></div>
                     </div>
                 </FormSection>
                 
@@ -194,7 +217,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                     <div className="grid-col-3">
                         <div className="form-group"><label>Horas Trabajadas</label><input type="number" name="weekly_hours" value={formData.weekly_hours || 44} onChange={handleChange} /></div>
                         <div className="form-group"><label>Días de la semana Part Time</label><input type="number" name="part_time_days" value={formData.part_time_days || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Usar Sueldo Mínimo</label><select name="use_minimum_wage" value={formData.use_minimum_wage ? 'SI' : 'NO'} onChange={handleChange}><option value="SI">SI</option><option value="NO">NO</option></select></div>
+                        <div className="form-group">
+                            <label>Usar Sueldo Mínimo</label>
+                            <select name="use_minimum_wage" value={formData.use_minimum_wage ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">SI</option>
+                                <option value="false">NO</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Factor Especial Horas Extra Valor Normal</label><input name="overtime_factor" value={formData.overtime_factor || 0.00795454} readOnly /></div>
                         <div className="form-group"><button type="button" className="btn">Calcular Factor</button></div>
                     </div>
@@ -204,14 +233,32 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                     <div className="grid-col-3">
                         <div className="form-group"><label>Porcentaje Trabajo Pesado Trabajador</label><input type="number" name="heavy_work_worker_percentage" value={formData.heavy_work_worker_percentage || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Porcentaje Trabajo Pesado Empleador</label><input type="number" name="heavy_work_employer_percentage" value={formData.heavy_work_employer_percentage || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Persona con Discapacidad - Pensionado por Invalidez</label><select name="is_disabled" value={formData.is_disabled ? 'SI' : 'NO'} onChange={handleChange}><option value="NO">NO</option><option value="SI">SI</option></select></div>
+                        <div className="form-group">
+                            <label>Persona con Discapacidad - Pensionado por Invalidez</label>
+                            <select name="is_disabled" value={formData.is_disabled ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">SI</option>
+                                <option value="false">NO</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Días Vacaciones Progresivas (Ej.0)</label><input type="number" name="progressive_vacation_days" value={formData.progressive_vacation_days || 0} onChange={handleChange} /></div>
                         <div className="form-group"><label>Años para iniciar Vacaciones Prog. (Ej.3)</label><input type="number" name="years_for_progressive_vacation" value={formData.years_for_progressive_vacation || 0} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Tecnico Extranjero Exención Cot. Previsionales</label><select name="is_foreign_tech_pension_exempt" value={formData.is_foreign_tech_pension_exempt ? 'SI' : 'NO'} onChange={handleChange}><option value="NO">NO</option><option value="SI">SI</option></select></div>
+                        <div className="form-group">
+                            <label>Tecnico Extranjero Exención Cot. Previsionales</label>
+                            <select name="is_foreign_tech_pension_exempt" value={formData.is_foreign_tech_pension_exempt ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">SI</option>
+                                <option value="false">NO</option>
+                            </select>
+                        </div>
                         <div className="form-group"><label>Tiene Ficha Covid</label><input name="has_covid_record" readOnly /></div>
                         <div className="form-group"><label>Banco</label><select name="bank_id" value={formData.bank_id || ''} onChange={handleChange}><option value="">Seleccione...</option>{bankOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                         <div className="form-group"><label>Número de Cuenta</label><input name="bank_account_number" value={formData.bank_account_number || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Es Zona Extrema</label><select name="is_extreme_zone" value={formData.is_extreme_zone ? 'SI' : 'NO'} onChange={handleChange}><option value="NO">NO</option><option value="SI">SI</option></select></div>
+                        <div className="form-group">
+                            <label>Es Zona Extrema</label>
+                            <select name="is_extreme_zone" value={formData.is_extreme_zone ? 'true' : 'false'} onChange={handleChange}>
+                                <option value="true">SI</option>
+                                <option value="false">NO</option>
+                            </select>
+                        </div>
                     </div>
                 </FormSection>
             </div>

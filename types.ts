@@ -108,6 +108,7 @@ export type Employee = {
     caja_loan_2?: number;
     second_caja?: string;
     has_accident_insurance?: boolean;
+    has_unemployment_insurance?: boolean;
     first_pension_affiliation_date?: string;
     is_voluntary_affiliate?: boolean;
 
