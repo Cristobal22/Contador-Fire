@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import type { ChartOfAccount, ChartOfAccountData } from '../types';
 import Modal from '../components/Modal';
 import Papa from 'papaparse';
+import { AccountForm } from '../components/AccountForm'; // Import the new form
 
 // --- Reusable Styles ---
 const styles: { [key: string]: React.CSSProperties } = {
@@ -14,62 +15,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     th: { borderBottom: '2px solid var(--border-color)', padding: '12px', textAlign: 'left', color: 'var(--text-light-color)' },
     td: { borderBottom: '1px solid var(--border-color)', padding: '12px', verticalAlign: 'middle' },
     actions: { display: 'flex', gap: '10px' },
-    // Styles for the empty state / initial setup view
     emptyStateContainer: { textAlign: 'center', padding: '4rem 2rem', backgroundColor: '#f8f9fa', borderRadius: '8px' },
     emptyStateTitle: { fontSize: '1.5rem', marginBottom: '1rem' },
     emptyStateText: { color: 'var(--text-light-color)', marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem auto' },
-    formGroup: { marginBottom: '1rem' },
-    label: { display: 'block', marginBottom: '0.5rem', fontWeight: 500 },
-    input: { width: '100%' },
 };
 
-// --- Account Form Component (for Create/Edit) ---
-const AccountForm: React.FC<{
-    account?: ChartOfAccount | null;
-    onSave: (data: ChartOfAccountData) => void;
-    onCancel: () => void;
-    isLoading: boolean;
-}> = ({ account, onSave, onCancel, isLoading }) => {
-    const [code, setCode] = useState(account?.code || '');
-    const [name, setName] = useState(account?.name || '');
-    const [type, setType] = useState(account?.type || 'Activo');
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!code || !name) return;
-        onSave({ code, name, type });
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Código</label>
-                    <input style={styles.input} type="text" value={code} onChange={e => setCode(e.target.value)} required />
-                </div>
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Nombre</label>
-                    <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} required />
-                </div>
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Tipo</label>
-                    <select style={styles.input} value={type} onChange={e => setType(e.target.value)} required>
-                        <option value="Activo">Activo</option>
-                        <option value="Pasivo">Pasivo</option>
-                        <option value="Patrimonio">Patrimonio</option>
-                        <option value="Ingreso">Ingreso</option>
-                        <option value="Gasto">Gasto</option>
-                        <option value="Costo">Costo</option>
-                    </select>
-                </div>
-            </div>
-            <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>{isLoading ? 'Guardando...' : 'Guardar'}</button>
-            </div>
-        </form>
-    );
-};
 
 // --- Main Chart of Accounts View ---
 const ChartOfAccountsView = () => {

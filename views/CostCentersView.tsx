@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import type { CostCenter, CostCenterData } from '../types';
 import Modal from '../components/Modal';
+import { CostCenterForm } from '../components/CostCenterForm';
 
-// --- Reusable Styles ---
 const styles: { [key: string]: React.CSSProperties } = {
     container: { padding: '2rem' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' },
@@ -13,48 +13,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     th: { borderBottom: '2px solid var(--border-color)', padding: '12px', textAlign: 'left', color: 'var(--text-light-color)' },
     td: { borderBottom: '1px solid var(--border-color)', padding: '12px', verticalAlign: 'middle' },
     actions: { display: 'flex', gap: '10px' },
-    formGroup: { marginBottom: '1rem' },
-    label: { display: 'block', marginBottom: '0.5rem', fontWeight: 500 },
-    input: { width: '100%' },
 };
 
-// --- Cost Center Form Component ---
-const CostCenterForm: React.FC<{
-    costCenter?: CostCenter | null;
-    onSave: (data: CostCenterData) => void;
-    onCancel: () => void;
-    isLoading: boolean;
-}> = ({ costCenter, onSave, onCancel, isLoading }) => {
-    const [code, setCode] = useState(costCenter?.code || '');
-    const [name, setName] = useState(costCenter?.name || '');
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!code || !name) return;
-        onSave({ code, name });
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Código</label>
-                    <input style={styles.input} type="text" value={code} onChange={e => setCode(e.target.value)} required />
-                </div>
-                <div style={styles.formGroup}>
-                    <label style={styles.label}>Nombre</label>
-                    <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} required />
-                </div>
-            </div>
-            <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>{isLoading ? 'Guardando...' : 'Guardar'}</button>
-            </div>
-        </form>
-    );
-};
-
-// --- Main Cost Centers View ---
 const CostCentersView = () => {
     const { costCenters, addCostCenter, updateCostCenter, deleteCostCenter, handleApiError, addNotification } = useSession();
     const [isModalOpen, setIsModalOpen] = useState(false);
