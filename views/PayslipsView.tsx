@@ -4,15 +4,13 @@ import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
 import Modal from '../components/Modal';
 import type { Payslip, PayslipData, Employee } from '../types';
-import { generatePayslipForEmployee } from '../utils/payrollEngine'; // CORREGIDO: Importamos desde el nuevo motor de cálculo
+import { generatePayslipForEmployee } from '../utils/payrollEngine'; // Importamos desde el motor de cálculo
 
-// Componente para el formulario de edición (lo mantenemos por ahora para ajustes)
+// Componente para el formulario de edición
 const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void, onCancel: () => void, isLoading: boolean }> = ({ payslip, onSave, onCancel, isLoading }) => {
-    // Formulario de edición simplificado. En el futuro se podría expandir.
     const [advances, setAdvances] = useState(payslip.breakdown?.advances || 0);
 
     const handleSave = () => {
-        // Lógica para actualizar y recalcular si es necesario
         onSave({ ...payslip, breakdown: { ...payslip.breakdown, advances } });
     };
     
@@ -36,13 +34,13 @@ const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void,
 
 const PayslipsView = () => {
     const { addNotification, handleApiError, ...session } = useSession();
-    const { employees, institutions, payslips, addPayslip, deletePayslip, updatePayslip, activePeriod, setActivePeriod } = session;
+    // Extraemos todos los datos necesarios de la sesión
+    const { employees, institutions, payslips, monthlyParameters, addPayslip, deletePayslip, updatePayslip, activePeriod, setActivePeriod } = session;
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Lógica para manejar el cambio de período en la UI
     const currentYear = new Date(activePeriod + '-02').getFullYear();
     const currentMonth = new Date(activePeriod + '-02').getMonth() + 1;
 
@@ -69,9 +67,9 @@ const PayslipsView = () => {
 
         for (const employee of employeesToProcess) {
             try {
-                const result = generatePayslipForEmployee(employee, institutions, activePeriod);
+                // ¡AHORA PASAMOS LOS PARÁMETROS MENSUALES REALES!
+                const result = generatePayslipForEmployee(employee, institutions, activePeriod, monthlyParameters);
                 
-                // Adaptar el resultado al formato de PayslipData
                 const payslipData: PayslipData = {
                     period: result.period,
                     employeeId: result.employeeId,
@@ -84,7 +82,7 @@ const PayslipsView = () => {
                         { name: 'Cotización Salud', amount: result.descuentos.cotizacionSalud },
                         { name: 'Seguro de Cesantía', amount: result.descuentos.seguroCesantia },
                     ],
-                    breakdown: { // Guardamos el desglose para futuras referencias
+                    breakdown: {
                         baseSalary: result.haberes.sueldoBase,
                         gratification: result.haberes.gratificacionLegal,
                         mealAllowance: result.haberes.colacion,
@@ -96,7 +94,8 @@ const PayslipsView = () => {
                 successCount++;
             } catch (error: any) {
                 errorCount++;
-                addNotification({ type: 'error', message: `Error al generar liquidación para ${employee.name}: ${error.message}` });
+                // Usamos handleApiError para unificar el manejo de errores y mostrarlo
+                handleApiError(error, `al generar liquidación para ${employee.name}`);
             }
         }
 

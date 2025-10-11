@@ -1,17 +1,31 @@
 
-import type { Employee, Institution, PayslipCalculationResult } from '../types';
+import type { Employee, Institution, PayslipCalculationResult, MonthlyParameter } from '../types';
 
-// A placeholder for fetching monthly parameters (UF, UTM, topes, etc.)
-// In a real app, this would come from the database or an external API for the given period.
-const getMonthlyParams = (period: string) => {
-    // These are simplified, hardcoded values for demonstration.
-    // In a real implementation, you would fetch these from your `monthly_parameters` table.
-    return {
-        UF: 37000,
-        UTM: 65000,
-        TopeImponibleAFP: 81.6 * 37000, // Approx 3,019,200
-        TopeImponibleAFC: 122.6 * 37000, // Approx 4,536,200
-    };
+/**
+ * Creates a lookup object for monthly parameters for a specific period.
+ * Throws an error if a required parameter is missing for that period.
+ * @param params - The full list of monthly parameters from the database.
+ * @param period - The period to filter for (e.g., "2023-10").
+ * @returns A key-value object of parameters for the given period.
+ */
+const createPeriodParams = (params: MonthlyParameter[], period: string) => {
+    const periodParams = params.filter(p => p.period === period);
+    
+    // Transform the array into a more accessible object like { UF: 37000, UTM: 65000, ... }
+    const paramMap = periodParams.reduce((acc, param) => {
+        acc[param.name] = param.value;
+        return acc;
+    }, {} as Record<string, number>);
+
+    // Validate that all required parameters exist for the period
+    const requiredKeys = ['UF', 'UTM', 'SueldoMinimo', 'TopeImponibleAFP', 'TopeImponibleAFC'];
+    for (const key of requiredKeys) {
+        if (paramMap[key] === undefined) {
+            throw new Error(`Parámetro mensual requerido '${key}' no encontrado para el período ${period}. Por favor, configúrelo en la sección de parámetros.`);
+        }
+    }
+
+    return paramMap;
 };
 
 /**
@@ -20,61 +34,58 @@ const getMonthlyParams = (period: string) => {
  * @param employee The employee record.
  * @param institutions A list of all institutions (for AFP/Health rates).
  * @param period The period for the calculation (e.g., "2023-10").
+ * @param monthlyParams The full list of monthly parameters from the database.
  * @returns The detailed payslip calculation result.
  */
 export const generatePayslipForEmployee = (
     employee: Employee,
     institutions: Institution[],
-    period: string
+    period: string,
+    monthlyParams: MonthlyParameter[] // <-- PARÁMETROS REALES AHORA
 ): PayslipCalculationResult => {
-    const params = getMonthlyParams(period);
+    // Usa los parámetros reales y dinámicos para el período
+    const params = createPeriodParams(monthlyParams, period);
 
     // 1. HABERES (Earnings)
     const sueldoBase = employee.baseSalary;
 
-    // Gratificación legal: 25% of salary with a cap of 4.75 * IMM (Ingreso Mínimo Mensual)
-    // We'll use a placeholder IMM for now.
-    const sueldoMinimo = 460000;
-    const gratificacionCap = 4.75 * sueldoMinimo / 12;
+    // Gratificación legal (usa el SueldoMinimo real de los parámetros)
+    const gratificacionCap = 4.75 * params.SueldoMinimo / 12;
     const gratificacionLegal = Math.min(sueldoBase * 0.25, gratificacionCap);
 
     const colacion = employee.mealAllowance || 0;
     const movilizacion = employee.transportAllowance || 0;
     
-    // Other non-taxable income can be added here.
     const totalNoImponible = colacion + movilizacion;
-
     const totalImponible = sueldoBase + gratificacionLegal;
     const totalHaberes = totalImponible + totalNoImponible;
 
     // 2. DESCUENTOS (Deductions)
     
-    // AFP Contribution
+    // AFP Contribution (usa el TopeImponibleAFP real)
     const afp = institutions.find(i => i.id === employee.afpId);
-    if (!afp) throw new Error(`AFP institution not found for employee ${employee.name}`);
+    if (!afp) throw new Error(`Institución AFP no encontrada para el empleado ${employee.name}`);
     const baseAfp = Math.min(totalImponible, params.TopeImponibleAFP);
     const cotizacionAFP = baseAfp * (afp.rate / 100);
 
-    // Health Contribution
+    // Health Contribution (usa la UF real)
     const health = institutions.find(i => i.id === employee.healthId);
-    if (!health) throw new Error(`Health institution not found for employee ${employee.name}`);
+    if (!health) throw new Error(`Institución de Salud no encontrada para el empleado ${employee.name}`);
     const planSaludPactadoUf = employee.healthPlanUf || 0;
     const planSaludPactadoPesos = planSaludPactadoUf * params.UF;
-    const cotizacionLegalSalud = totalImponible * 0.07; // 7% legal minimum
+    const cotizacionLegalSalud = totalImponible * 0.07;
     const cotizacionSalud = Math.min(planSaludPactadoPesos, cotizacionLegalSalud);
     
-    // Unemployment Insurance (AFC)
+    // Unemployment Insurance (AFC) (usa el TopeImponibleAFC real)
     const baseAfc = Math.min(totalImponible, params.TopeImponibleAFC);
-    // Assuming indefinite contract for simplicity (0.6% employee, 2.4% employer)
     const seguroCesantia = baseAfc * 0.006;
 
-    // Impuesto Único (Simplified calculation)
-    // This is a progressive tax. A real implementation would use a tax bracket table.
-    // For simplicity, we'll apply a flat 4% on incomes over a certain threshold.
+    // Impuesto Único (usa la UTM real)
+    // AVISO: El cálculo sigue siendo una simplificación. Un cálculo real requiere una tabla de tramos.
     const taxBase = totalImponible - cotizacionAFP - cotizacionSalud - seguroCesantia;
     let impuestoUnico = 0;
-    if (taxBase > 13.5 * params.UTM) { // Simplified threshold
-        impuestoUnico = (taxBase - 13.5 * params.UTM) * 0.04; // Simplified rate
+    if (taxBase > 13.5 * params.UTM) { 
+        impuestoUnico = (taxBase - 13.5 * params.UTM) * 0.04;
     }
 
     const totalDescuentosLegales = cotizacionAFP + cotizacionSalud + seguroCesantia + impuestoUnico;
