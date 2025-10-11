@@ -4,15 +4,117 @@ import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
 import { VoucherForm } from '../components/Forms';
 import type { Voucher, VoucherData, Account } from '../types';
+import { CrudView } from '../components/CrudView'; // Assuming a generic CrudView exists
 
-const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: Account[] }> = ({ voucher, onClose, accounts }) => {
-    if (!voucher) return null;
-    
-    const getAccountName = (id: number | '') => (accounts || []).find(a => a.id === id)?.name || 'N/A';
+const VouchersView: React.FC = () => {
+    const { session, loading, addNotification, handleApiError } = useSession();
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+
+    const vouchers = session?.vouchers || [];
+    const accounts = session?.accounts || [];
+
+    const handleAddNew = () => {
+        setSelectedVoucher(null);
+        setIsFormModalOpen(true);
+    };
+
+    const handleEdit = (voucher: Voucher) => {
+        setSelectedVoucher(voucher);
+        setIsFormModalOpen(true);
+    };
+
+    const handleViewDetails = (voucher: Voucher) => {
+        setSelectedVoucher(voucher);
+        setIsDetailModalOpen(true);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!session?.deleteVoucher) return;
+        if (window.confirm('¿Está seguro de que desea eliminar este comprobante? Esta acción no se puede deshacer.')) {
+            try {
+                await session.deleteVoucher(id);
+                addNotification({ type: 'success', message: 'Comprobante eliminado con éxito.' });
+            } catch (error: any) {
+                handleApiError(error, 'al eliminar el comprobante');
+            }
+        }
+    };
+
+    const handleSave = async (voucherData: VoucherData) => {
+        if (!session?.addVoucher || !session?.updateVoucher) return;
+        setIsSubmitting(true);
+        try {
+            if (selectedVoucher) {
+                await session.updateVoucher({ ...voucherData, id: selectedVoucher.id });
+                addNotification({ type: 'success', message: 'Comprobante actualizado con éxito.' });
+            } else {
+                await session.addVoucher(voucherData);
+                addNotification({ type: 'success', message: 'Comprobante guardado con éxito.' });
+            }
+            setIsFormModalOpen(false);
+            setSelectedVoucher(null);
+        } catch (error: any) {
+            handleApiError(error, 'al guardar el comprobante');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const columns = [
+        { id: 'date', header: 'Fecha', accessor: (v: Voucher) => v.date },
+        { id: 'description', header: 'Glosa', accessor: (v: Voucher) => v.description },
+        { id: 'entries', header: 'N° Asientos', accessor: (v: Voucher) => v.entries.length },
+    ];
+
+    return (
+        <CrudView
+            title="Comprobantes Contables"
+            data={vouchers}
+            columns={columns}
+            onAddNew={handleAddNew}
+            onEdit={handleEdit}
+            onDelete={(v) => handleDelete(v.id)}
+            onView={handleViewDetails} // Add a view action
+            loading={loading}
+            companyRequired
+        >
+            {isFormModalOpen && (
+                <Modal 
+                    isOpen={isFormModalOpen}
+                    onClose={() => setIsFormModalOpen(false)}
+                    title={selectedVoucher ? 'Editar Comprobante' : 'Agregar Nuevo Comprobante'}
+                    size="lg"
+                >
+                    <VoucherForm 
+                        onSave={handleSave} 
+                        onCancel={() => setIsFormModalOpen(false)} 
+                        isLoading={isSubmitting} 
+                        initialData={selectedVoucher} 
+                        accounts={accounts} 
+                    />
+                </Modal>
+            )}
+
+            {isDetailModalOpen && selectedVoucher && (
+                <VoucherDetailModal 
+                    voucher={selectedVoucher} 
+                    onClose={() => setIsDetailModalOpen(false)} 
+                    accounts={accounts} 
+                />
+            )}
+        </CrudView>
+    );
+};
+
+const VoucherDetailModal: React.FC<{ voucher: Voucher, onClose: () => void, accounts: Account[] }> = ({ voucher, onClose, accounts }) => {
+    const getAccountName = (id: number | '') => accounts.find(a => a.id === id)?.name || 'N/A';
     const totalDebit = voucher.entries.reduce((sum, e) => sum + e.debit, 0);
 
     return (
-        <Modal isOpen={!!voucher} onClose={onClose} title="Detalle Comprobante Contable" size="lg">
+        <Modal isOpen={true} onClose={onClose} title="Detalle Comprobante Contable" size="lg">
             <div className="modal-body">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <div><strong>Fecha:</strong> {voucher.date}</div>
@@ -49,98 +151,6 @@ const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => voi
                 <button type="button" className="btn btn-secondary" onClick={onClose}>Cerrar</button>
             </div>
         </Modal>
-    )
-}
-
-
-const VouchersView: React.FC = () => {
-    const { session, addNotification, handleApiError } = useSession();
-    const { vouchers, accounts, addVoucher, updateVoucher, deleteVoucher } = session || {};
-    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
-    const [viewingVoucher, setViewingVoucher] = useState<Voucher | null>(null);
-
-    const handleAddNew = () => {
-        setEditingVoucher(null);
-        setIsFormModalOpen(true);
-    };
-    
-    const handleEdit = (voucher: Voucher) => {
-        setEditingVoucher(voucher);
-        setIsFormModalOpen(true);
-    };
-    
-    const handleDelete = async (id: number) => {
-        if (window.confirm('¿Está seguro de que desea eliminar este comprobante? Esta acción no se puede deshacer.') && deleteVoucher) {
-            try {
-                await deleteVoucher(id);
-                addNotification({ type: 'success', message: 'Comprobante eliminado con éxito.' });
-            } catch (error: any) {
-                handleApiError(error, 'al eliminar el comprobante');
-            }
-        }
-    };
-
-    const handleSave = async (voucherData: VoucherData) => {
-        setIsLoading(true);
-        try {
-            if (editingVoucher && updateVoucher) {
-                await updateVoucher({ ...voucherData, id: editingVoucher.id });
-                addNotification({ type: 'success', message: 'Comprobante actualizado con éxito.' });
-            } else if (addVoucher) {
-                await addVoucher(voucherData);
-                addNotification({ type: 'success', message: 'Comprobante guardado con éxito.' });
-            }
-            setIsFormModalOpen(false);
-            setEditingVoucher(null);
-        } catch (error: any) {
-            handleApiError(error, 'al guardar el comprobante');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleCloseForm = () => {
-        setIsFormModalOpen(false);
-        setEditingVoucher(null);
-    }
-
-    if (!session) return <div>Cargando...</div>;
-
-    return (
-        <div>
-            <div style={{ marginBottom: '16px' }}>
-                <button className="btn btn-primary" onClick={handleAddNew}>
-                    <span className="material-symbols-outlined">add</span>Agregar Nuevo Comprobante
-                </button>
-            </div>
-            <table>
-                <thead>
-                    <tr><th>Fecha</th><th>Glosa</th><th>N° Asientos</th><th>Acciones</th></tr>
-                </thead>
-                <tbody>
-                    {(vouchers && vouchers.length > 0) ? vouchers.map(v => (
-                        <tr key={v.id}>
-                            <td>{v.date}</td>
-                            <td>{v.description}</td>
-                            <td>{v.entries.length}</td>
-                            <td>
-                                <button className="btn-icon" title="Ver Detalles" onClick={() => setViewingVoucher(v)}><span className="material-symbols-outlined">visibility</span></button>
-                                <button className="btn-icon" title="Editar" onClick={() => handleEdit(v)}><span className="material-symbols-outlined">edit</span></button>
-                                <button className="btn-icon" title="Eliminar" onClick={() => handleDelete(v.id)}><span className="material-symbols-outlined">delete</span></button>
-                            </td>
-                        </tr>
-                    )) : <tr><td colSpan={4}>No hay registros.</td></tr>}
-                </tbody>
-            </table>
-            
-            <Modal isOpen={isFormModalOpen} onClose={handleCloseForm} title={editingVoucher ? 'Editar Comprobante' : 'Agregar Nuevo Comprobante'} size="lg">
-                <VoucherForm onSave={handleSave} onCancel={handleCloseForm} isLoading={isLoading} initialData={editingVoucher} accounts={accounts || []} />
-            </Modal>
-            
-            <VoucherDetailModal voucher={viewingVoucher} onClose={() => setViewingVoucher(null)} accounts={accounts || []} />
-        </div>
     );
 };
 

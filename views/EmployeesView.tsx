@@ -5,27 +5,33 @@ import { EmployeeForm } from '../components/EmployeeForm';
 import Modal from '../components/Modal';
 import { formatRut } from '../utils/format';
 import type { Employee, EmployeeData } from '../types';
+import { CrudView } from '../components/CrudView';
 
-const EmployeesView = () => {
-    const { session, addNotification, handleApiError } = useSession();
-    const { employees, institutions, costCenters, addEmployee, updateEmployee, deleteEmployee } = session || {};
+const EmployeesView: React.FC = () => {
+    const { session, loading, addNotification, handleApiError } = useSession();
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+    const employees = session?.employees || [];
+    const institutions = session?.institutions || [];
+    const costCenters = session?.costCenters || [];
 
     const handleAddNew = () => {
-        setEditingEmployee(null);
+        setSelectedEmployee(null);
         setIsFormModalOpen(true);
     };
 
     const handleEdit = (employee: Employee) => {
-        setEditingEmployee(employee);
+        setSelectedEmployee(employee);
         setIsFormModalOpen(true);
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Está seguro de que desea eliminar este empleado?') && deleteEmployee) {
+        if (!session?.deleteEmployee) return;
+        if (window.confirm('¿Está seguro de que desea eliminar este empleado?')) {
             try {
-                await deleteEmployee(id);
+                await session.deleteEmployee(id);
                 addNotification({ type: 'success', message: 'Empleado eliminado con éxito.' });
             } catch (error: any) {
                 handleApiError(error, 'al eliminar el empleado');
@@ -34,74 +40,61 @@ const EmployeesView = () => {
     };
 
     const handleSave = async (employeeData: EmployeeData) => {
+        if (!session?.addEmployee || !session?.updateEmployee) return;
+        setIsSubmitting(true);
         try {
-            if (editingEmployee && updateEmployee) {
-                const { id, ...data } = employeeData as Employee;
-                await updateEmployee({ ...data, id: editingEmployee.id });
+            if (selectedEmployee) {
+                await session.updateEmployee({ ...employeeData, id: selectedEmployee.id });
                 addNotification({ type: 'success', message: 'Empleado actualizado con éxito.' });
-            } else if (addEmployee) {
-                await addEmployee(employeeData);
+            } else {
+                await session.addEmployee(employeeData);
                 addNotification({ type: 'success', message: 'Empleado agregado con éxito.' });
             }
             setIsFormModalOpen(false);
-            setEditingEmployee(null);
+            setSelectedEmployee(null);
         } catch (error: any) {
             handleApiError(error, 'al guardar el empleado');
+        } finally {
+            setIsSubmitting(false);
         }
     };
     
-    const handleCloseForm = () => {
-        setIsFormModalOpen(false);
-        setEditingEmployee(null);
-    }
-    
-    if (!session) return <div>Cargando...</div>; // O un spinner/skeleton
+    const columns = [
+        { id: 'rut', header: 'RUT', accessor: (emp: Employee) => formatRut(emp.rut) },
+        { id: 'name', header: 'Nombre', accessor: (emp: Employee) => `${emp.name} ${emp.paternal_lastname || ''}` },
+        { id: 'position', header: 'Cargo', accessor: (emp: Employee) => emp.position },
+        {
+            id: 'baseSalary',
+            header: 'Sueldo Base',
+            accessor: (emp: Employee) => (emp.baseSalary || 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }),
+        },
+        { id: 'hireDate', header: 'Fecha Contratación', accessor: (emp: Employee) => emp.hireDate },
+    ];
 
     return (
-        <div>
-            <div style={{ marginBottom: '16px' }}>
-                <button className="btn btn-primary" onClick={handleAddNew}>
-                    <span className="material-symbols-outlined">add</span>Agregar Nuevo Empleado
-                </button>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>RUT</th>
-                        <th>Nombre</th>
-                        <th>Cargo</th>
-                        <th>Sueldo Base</th>
-                        <th>Fecha Contratación</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {(employees && employees.length > 0) ? employees.map(emp => (
-                        <tr key={emp.id}>
-                            <td>{formatRut(emp.rut)}</td>
-                            <td>{`${emp.name} ${emp.paternal_lastname || ''}`}</td>
-                            <td>{emp.position}</td>
-                            <td>{(emp.baseSalary || 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</td>
-                            <td>{emp.hireDate}</td>
-                            <td>
-                                <button className="btn-icon" title="Editar" onClick={() => handleEdit(emp)}><span className="material-symbols-outlined">edit</span></button>
-                                <button className="btn-icon" title="Eliminar" onClick={() => handleDelete(emp.id)}><span className="material-symbols-outlined">delete</span></button>
-                            </td>
-                        </tr>
-                    )) : <tr><td colSpan={6}>No hay empleados registrados.</td></tr>}
-                </tbody>
-            </table>
-            
-            <Modal isOpen={isFormModalOpen} onClose={handleCloseForm} title={editingEmployee ? 'Editar Empleado' : 'Agregar Nuevo Empleado'} size="xl">
-                <EmployeeForm 
-                    onSave={handleSave} 
-                    onCancel={handleCloseForm} 
-                    initialData={editingEmployee}
-                    institutions={institutions || []}
-                    costCenters={costCenters || []}
-                />
-            </Modal>
-        </div>
+        <CrudView
+            title="Ficha de Personal"
+            data={employees}
+            columns={columns}
+            onAddNew={handleAddNew}
+            onEdit={handleEdit}
+            onDelete={(emp) => handleDelete(emp.id)}
+            loading={loading}
+            companyRequired
+        >
+            {isFormModalOpen && (
+                 <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={selectedEmployee ? 'Editar Empleado' : 'Agregar Nuevo Empleado'} size="xl">
+                    <EmployeeForm 
+                        onSave={handleSave} 
+                        onCancel={() => setIsFormModalOpen(false)} 
+                        initialData={selectedEmployee}
+                        institutions={institutions}
+                        costCenters={costCenters}
+                        isSubmitting={isSubmitting}
+                    />
+                </Modal>
+            )}
+        </CrudView>
     );
 };
 
