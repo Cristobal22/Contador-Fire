@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useSession } from '../context/SessionContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -41,7 +42,7 @@ const COLORS = ['#1a73e8', '#1e8e3e', '#d93025', '#f9ab00', '#8f00ff', '#ff6d00'
 const DashboardView = () => {
     const { vouchers, accounts, activePeriod, periods } = useSession();
 
-    const activePeriodLabel = periods.find(p => p.value === activePeriod)?.label || activePeriod;
+    const activePeriodLabel = (periods && periods.length > 0) ? periods.find(p => p.value === activePeriod)?.label || activePeriod : activePeriod;
 
     const expenseData = useMemo(() => {
         // 1. Filter for expense accounts (type 'Resultado').

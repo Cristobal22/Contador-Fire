@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { unformatRut } from '../utils/format';
 import type { 
     User, Company, CompanyData, ChartOfAccount, ChartOfAccountData, Subject, SubjectData, 
-    CostCenter, CostCenterData, Item, ItemData, Notification
+    CostCenter, CostCenterData, Item, ItemData, Notification, Voucher
 } from '../types';
 
 
@@ -17,10 +17,13 @@ interface SessionContextType {
     setActiveCompanyId: (id: number | null) => void;
     isLoading: boolean;
     notifications: (Notification & { id: number })[];
-    chartOfAccounts: ChartOfAccount[];
+    accounts: ChartOfAccount[];
     subjects: Subject[];
     costCenters: CostCenter[];
     items: Item[];
+    vouchers: Voucher[];
+    periods: { label: string; value: string; }[];
+    activePeriod: string;
     login: (email: string, pass: string) => Promise<User>;
     logout: () => void;
     sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -48,15 +51,44 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
-    const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>([]);
+    const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
     const [items, setItems] = useState<Item[]>([]);
+    const [vouchers, setVouchers] = useState<Voucher[]>([]);
+    const [periods, setPeriods] = useState<{ label: string; value: string; }[]>([]);
+    const [activePeriod, setActivePeriod] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [notifications, setNotifications] = useState<(Notification & { id: number })[]>([]);
     const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(null);
 
     const activeCompany = useMemo(() => companies.find(c => c.id === activeCompanyId) || null, [companies, activeCompanyId]);
+
+    // Helper function to generate month periods for the last 12 months
+    const generatePeriods = () => {
+        const months = [];
+        const date = new Date();
+        for (let i = 0; i < 12; i++) {
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+            const monthStr = month.toString().padStart(2, '0');
+            months.push({
+                value: `${year}-${monthStr}`,
+                label: `${year}-${monthStr}`
+            });
+            date.setMonth(date.getMonth() - 1);
+        }
+        return months;
+    };
+
+    // Set initial periods and active period on component mount
+    useEffect(() => {
+        const generatedPeriods = generatePeriods();
+        setPeriods(generatedPeriods);
+        if (generatedPeriods.length > 0) {
+            setActivePeriod(generatedPeriods[0].value);
+        }
+    }, []);
 
     const addNotification = (notification: Omit<Notification, 'id'>) => {
         const newId = Date.now();
@@ -84,7 +116,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             return profiles[0]; // Return the first profile found
         }
 
-        // If no profile, create one
         const role = user.email === 'cvillalobosn22@gmail.com' ? 'administrador' : 'contador';
         
         const { data: newProfile, error: createError } = await supabase
@@ -111,10 +142,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         };
         try {
             await Promise.all([
-                fetchAndSet('chart_of_accounts', setChartOfAccounts),
+                fetchAndSet('chart_of_accounts', setAccounts),
                 fetchAndSet('subjects', setSubjects),
                 fetchAndSet('cost_centers', setCostCenters),
                 fetchAndSet('items', setItems),
+                fetchAndSet('vouchers', setVouchers),
             ]);
         } catch (error) {
             handleApiError(error, 'al sincronizar datos');
@@ -301,7 +333,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const contextValue = {
         currentUser, companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading, notifications,
-        chartOfAccounts, subjects, costCenters, items,
+        accounts, subjects, costCenters, items, vouchers, periods, activePeriod,
         login, logout, sendPasswordResetEmail, addNotification, handleApiError,
         addCompany, updateCompany, deleteCompany,
         addChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
