@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from '../context/SessionContext';
 import { formatRut } from '../utils/format';
-import type { VoucherData, VoucherEntry, InvoiceData, FeeInvoiceData, Voucher } from '../types';
+import { voucherTypes, feeInvoiceTaxRetentionRates } from '../data/accounting';
+import type { VoucherData, VoucherEntry, InvoiceData, FeeInvoiceData, Voucher, Subject } from '../types';
 
 type FormProps = {
     onCancel: () => void;
@@ -16,30 +17,29 @@ const SaveButton: React.FC<{ isLoading?: boolean; text?: string; disabled?: bool
 );
 
 
-export const GenericForm = <T extends object>({ onSave, onCancel, initialData, fields, isLoading, loadingMessage }: { onSave: (data: T) => void; initialData: T; fields: { name: string, label: string, type: string, options?: any[] }[]; loadingMessage?: string; } & FormProps) => {
+export const GenericForm = <T extends object>({ onSave, onCancel, initialData, fields, isLoading, loadingMessage }: { onSave: (data: T) => void; initialData: T; fields: { name: string, label: string, type: string, options?: any[], required?: boolean }[]; loadingMessage?: string; } & FormProps) => {
     const [formData, setFormData] = useState(initialData);
     useEffect(() => { setFormData(initialData) }, [initialData]);
     
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+
         const field = fields.find(f => f.name === name);
         if (!field) return;
 
         let finalValue: any = value;
 
-        if (name === 'rut') {
+        if (type === 'checkbox') {
+            finalValue = (e.target as HTMLInputElement).checked;
+        } else if (name === 'rut') {
             finalValue = formatRut(value);
         } else if (field.type === 'number') {
             finalValue = value === '' ? null : parseFloat(value);
-        } else if (field.type === 'select') {
-            const firstOption = field.options?.[0];
-            if (firstOption) {
-                const optionValue = typeof firstOption === 'object' && 'value' in firstOption ? firstOption.value : firstOption;
-                if (typeof optionValue === 'number') {
-                    finalValue = Number(value);
-                }
-            }
+        } else if (field.type === 'select-one') {
+             const firstOption = field.options?.[0];
+             if (firstOption && typeof firstOption === 'object' && typeof firstOption.value === 'number') {
+                 finalValue = Number(value);
+             }
         }
 
         setFormData(prev => ({ ...prev, [name]: finalValue }));
@@ -52,7 +52,7 @@ export const GenericForm = <T extends object>({ onSave, onCancel, initialData, f
 
     return (
         <form onSubmit={handleSubmit}>
-            <div className="modal-body">{fields.map(f => (<div className="form-group" key={f.name}><label htmlFor={f.name}>{f.label}</label>{f.type === 'select' ? (<select id={f.name} name={f.name} value={(formData as any)[f.name]} onChange={handleChange} required>{f.options?.map(o => <option key={typeof o === 'object' ? o.value : o} value={typeof o === 'object' ? o.value : o}>{typeof o === 'object' ? o.label : o}</option>)}</select>) : (<input type={f.type} id={f.name} name={f.name} value={(formData as any)[f.name] ?? ''} onChange={handleChange} required />)}</div>))}</div>
+            <div className="modal-body">{fields.map(f => (<div className="form-group" key={f.name}><label htmlFor={f.name}>{f.label}</label>{f.type === 'select' ? (<select id={f.name} name={f.name} value={(formData as any)[f.name]} onChange={handleChange} required={f.required}>{f.options?.map(o => <option key={typeof o === 'object' ? o.value : o} value={typeof o === 'object' ? o.value : o}>{typeof o === 'object' ? o.label : o}</option>)}</select>) : (<input type={f.type} id={f.name} name={f.name} value={(formData as any)[f.name] ?? ''} onChange={handleChange} required={f.required} />)}</div>))}</div>
             <div className="modal-footer">
                 {isLoading && loadingMessage && <span style={{marginRight: 'auto', color: 'var(--text-light-color)', fontSize: '12px'}}>{loadingMessage}</span>}
                 <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
@@ -64,16 +64,19 @@ export const GenericForm = <T extends object>({ onSave, onCancel, initialData, f
 
 export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; initialData?: Voucher | null; } & FormProps> = ({ onSave, onCancel, isLoading, initialData }) => {
     const { accounts } = useSession();
+    const [type, setType] = useState(voucherTypes[0].code);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [description, setDescription] = useState('');
     const [entries, setEntries] = useState<Omit<VoucherEntry, 'id'>[]>([{ accountId: '', debit: 0, credit: 0 }]);
     
     useEffect(() => {
         if (initialData) {
+            setType(initialData.type);
             setDate(initialData.date);
             setDescription(initialData.description);
             setEntries(initialData.entries);
         } else {
+            setType(voucherTypes[0].code);
             setDate(new Date().toISOString().split('T')[0]);
             setDescription('');
             setEntries([{ accountId: '', debit: 0, credit: 0 }]);
@@ -82,7 +85,6 @@ export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; ini
 
     const handleEntryChange = (index: number, field: 'debit' | 'credit', value: string) => {
         const numericValue = value === '' ? 0 : parseInt(value, 10);
-        // Prevent entering negative numbers
         if (!isNaN(numericValue) && numericValue >= 0) {
             setEntries(prev => prev.map((e, i) => (i === index ? { ...e, [field]: numericValue } : e)));
         }
@@ -102,6 +104,7 @@ export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; ini
         e.preventDefault(); 
         if (!isBalanced) return; 
         onSave({ 
+            type,
             date, 
             description, 
             entries: entries.filter(e => e.accountId).map(e => ({...e, id: Date.now() + Math.random()})) 
@@ -112,6 +115,12 @@ export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; ini
         <form onSubmit={handleSubmit}>
             <div className="modal-body">
                 <div style={{display: 'flex', gap: '16px'}}>
+                    <div className="form-group" style={{ flex: '0 0 180px' }}>
+                        <label htmlFor="type">Tipo</label>
+                        <select id="type" value={type} onChange={e => setType(e.target.value)} required>
+                            {voucherTypes.map(vt => <option key={vt.code} value={vt.code}>{vt.name}</option>)}
+                        </select>
+                    </div>
                     <div className="form-group" style={{ flex: '0 0 180px' }}>
                         <label htmlFor="date">Fecha</label>
                         <input type="date" id="date" value={date} onChange={e => setDate(e.target.value)} required />
@@ -163,11 +172,17 @@ export const VoucherForm: React.FC<{ onSave: (voucher: VoucherData) => void; ini
 };
 
 export const InvoiceForm: React.FC<{ onSave: (invoice: InvoiceData) => void; type: 'Compra' | 'Venta' } & FormProps> = ({ onSave, onCancel, type, isLoading }) => {
-    const { subjects } = useSession();
+    const { subjects, monthlyParameters } = useSession();
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], invoiceNumber: '', subjectId: 0, net: 0, });
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: name === 'net' || name === 'subjectId' ? Number(value) : value })); };
-    const tax = Math.round(formData.net * 0.19);
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { 
+        const { name, value } = e.target; 
+        setFormData(prev => ({ ...prev, [name]: (name === 'net' || name === 'subjectId') ? Number(value) : value })); 
+    };
+    
+    const IVA_RATE = monthlyParameters.find(p => p.name === 'IVA')?.value || 0.19;
+    const tax = Math.round(formData.net * IVA_RATE);
     const total = formData.net + tax;
+    
     const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave({ ...formData, tax, total, type }); };
     const subjectType = type === 'Compra' ? 'Proveedor' : 'Cliente';
 
@@ -177,7 +192,11 @@ export const InvoiceForm: React.FC<{ onSave: (invoice: InvoiceData) => void; typ
                 <div className="form-group"><label htmlFor="date">Fecha</label><input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required /></div>
                 <div className="form-group"><label htmlFor="invoiceNumber">Número Factura</label><input type="text" id="invoiceNumber" name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required /></div>
                 <div className="form-group"><label htmlFor="subjectId">{subjectType}</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{(subjects || []).filter(s => s.type === subjectType).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                <div style={{display: 'flex', gap: '16px'}}><div className="form-group"><label htmlFor="net">Neto</label><input type="number" id="net" name="net" value={formData.net} onChange={handleChange} required /></div><div className="form-group"><label>IVA (19%)</label><input type="text" value={tax.toLocaleString('es-CL')} readOnly /></div><div className="form-group"><label>Total</label><input type="text" value={total.toLocaleString('es-CL')} readOnly /></div></div>
+                <div style={{display: 'flex', gap: '16px'}}>
+                    <div className="form-group"><label htmlFor="net">Neto</label><input type="number" id="net" name="net" value={formData.net} onChange={handleChange} required /></div>
+                    <div className="form-group"><label>IVA ({(IVA_RATE * 100).toFixed(0)}%)</label><input type="text" value={tax.toLocaleString('es-CL')} readOnly /></div>
+                    <div className="form-group"><label>Total</label><input type="text" value={total.toLocaleString('es-CL')} readOnly /></div>
+                </div>
             </div>
             <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button><SaveButton isLoading={isLoading} /></div>
         </form>
@@ -187,24 +206,46 @@ export const InvoiceForm: React.FC<{ onSave: (invoice: InvoiceData) => void; typ
 export const FeeInvoiceForm: React.FC<{ onSave: (invoice: FeeInvoiceData) => void; } & FormProps> = ({ onSave, onCancel, isLoading }) => {
     const { subjects } = useSession();
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], invoiceNumber: '', subjectId: 0, grossAmount: 0, });
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: name === 'grossAmount' || name === 'subjectId' ? Number(value) : value })); };
-    
-    const TAX_RETENTION_RATE = 0.1375; // 13.75% for 2024
-    const taxRetention = Math.round(formData.grossAmount * TAX_RETENTION_RATE);
-    const netAmount = formData.grossAmount - taxRetention;
 
-    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave({ ...formData, taxRetention, netAmount }); };
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: (name === 'grossAmount' || name === 'subjectId') ? Number(value) : value }));
+    };
+    
+    const getPPMTaxRate = (year: number) => {
+        const applicableRate = feeInvoiceTaxRetentionRates.reduce((acc, curr) => {
+            return curr.year <= year && curr.year > acc.year ? curr : acc;
+        }, feeInvoiceTaxRetentionRates[0]);
+        return applicableRate?.rate || 0;
+    };
+
+    const currentYear = new Date(formData.date).getFullYear();
+    const selectedSubject = subjects.find(s => s.id === formData.subjectId);
+
+    const ppmTaxRate = getPPMTaxRate(currentYear);
+    const solidarityLoanRate = (selectedSubject?.has_solidarity_loan && [2021, 2022].includes(currentYear)) ? 0.03 : 0;
+
+    const ppmRetention = Math.round(formData.grossAmount * ppmTaxRate);
+    const solidarityLoanRetention = Math.round(formData.grossAmount * solidarityLoanRate);
+    const totalRetention = ppmRetention + solidarityLoanRetention;
+    const netAmount = formData.grossAmount - totalRetention;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ ...formData, taxRetention: totalRetention, netAmount });
+    };
     
     return (
         <form onSubmit={handleSubmit}>
             <div className="modal-body">
                 <div className="form-group"><label htmlFor="date">Fecha</label><input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required /></div>
                 <div className="form-group"><label htmlFor="invoiceNumber">Número Boleta</label><input type="text" id="invoiceNumber" name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required /></div>
-                <div className="form-group"><label htmlFor="subjectId">Proveedor</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value={0} disabled>Seleccione...</option>{(subjects || []).filter(s => s.type === 'Proveedor').map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                <div style={{display: 'flex', gap: '16px'}}>
-                   <div className="form-group"><label htmlFor="grossAmount">Monto Bruto</label><input type="number" id="grossAmount" name="grossAmount" value={formData.grossAmount} onChange={handleChange} required /></div>
-                   <div className="form-group"><label>Retención ({TAX_RETENTION_RATE * 100}%)</label><input type="text" value={taxRetention.toLocaleString('es-CL')} readOnly /></div>
-                   <div className="form-group"><label>Monto Líquido</label><input type="text" value={netAmount.toLocaleString('es-CL')} readOnly /></div>
+                <div className="form-group"><label htmlFor="subjectId">Proveedor</label><select id="subjectId" name="subjectId" value={formData.subjectId} onChange={handleChange} required><option value="" disabled>Seleccione...</option>{(subjects || []).filter(s => s.type === 'Proveedor').map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                <div style={{display: 'flex', gap: '16px', alignItems: 'flex-end'}}>
+                   <div className="form-group" style={{flex: 1}}><label htmlFor="grossAmount">Monto Bruto</label><input type="number" id="grossAmount" name="grossAmount" value={formData.grossAmount} onChange={handleChange} required /></div>
+                   <div className="form-group" style={{flex: 1}}><label>Retención PPM ({(ppmTaxRate * 100).toFixed(2)}%)</label><input type="text" value={ppmRetention.toLocaleString('es-CL')} readOnly /></div>
+                   {solidarityLoanRate > 0 && <div className="form-group" style={{flex: 1}}><label>Ret. Préstamo Solidario (3%)</label><input type="text" value={solidarityLoanRetention.toLocaleString('es-CL')} readOnly /></div>}
+                   <div className="form-group" style={{flex: 1}}><label>Monto Líquido</label><input type="text" value={netAmount.toLocaleString('es-CL')} readOnly /></div>
                 </div>
             </div>
             <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button><SaveButton isLoading={isLoading} /></div>

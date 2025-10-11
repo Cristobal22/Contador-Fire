@@ -1,4 +1,3 @@
-
 CREATE TABLE account_groups (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL
@@ -54,3 +53,15 @@ INSERT INTO institutions (code, name, type, cotizacion_obligatoria, codigo_previ
 ('SSS', 'Servicio Seguro social', 'afp', 18.84, '09', 'INP', '105'),
 ('STMA', 'Capital', 'afp', 11.44, '33', 'AFP', '31'),
 ('UNO', 'UNO', 'afp', 10.49, '35', 'AFP', '19');
+
+
+CREATE TABLE monthly_parameters (
+    id SERIAL PRIMARY KEY,
+    company_id INT NOT NULL,
+    name TEXT NOT NULL,
+    value NUMERIC NOT NULL
+);
+
+-- Default monthly parameters for a new company
+INSERT INTO monthly_parameters (company_id, name, value) VALUES
+(1, 'IVA', 0.19);

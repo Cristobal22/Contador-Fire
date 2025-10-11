@@ -31,6 +31,7 @@ export type Company = {
     made_by?: string;
     reviewed_by?: string;
     approved_by?: string;
+    accumulated_result_account_id?: number;
 };
 
 // CompanyData for creation only needs essential fields
@@ -42,7 +43,7 @@ export type ChartOfAccountData = Omit<ChartOfAccount, 'id'>;
 export type AccountGroup = { id: number; code: string; name: string; format: string; levels: number; transitionalType: 'balance' | 'result'; movementType: 'debtor' | 'creditor'; length: number; }
 export type AccountGroupData = Omit<AccountGroup, 'id'>;
 
-export type Subject = { id: number; rut: string; name: string; type: 'Cliente' | 'Proveedor'; }
+export type Subject = { id: number; rut: string; name: string; type: 'Cliente' | 'Proveedor'; has_solidarity_loan?: boolean; }
 export type SubjectData = Omit<Subject, 'id'>;
 
 export type Item = { id: number; sku: string; name: string; }
@@ -200,7 +201,7 @@ export type Payslip = {
 export type PayslipData = { period: string; employeeId: number; };
 
 export type VoucherEntry = { id: number; accountId: number | ''; debit: number; credit: number; };
-export type Voucher = { id: number; date: string; description: string; entries: VoucherEntry[]; };
+export type Voucher = { id: number; type: string; date: string; description: string; entries: VoucherEntry[]; };
 export type VoucherData = Omit<Voucher, 'id'>;
 
 export type Invoice = { id: number; date: string; invoiceNumber: string; subjectId: number; net: number; tax: number; total: number; type: 'Compra' | 'Venta' }
@@ -209,7 +210,17 @@ export type InvoiceData = Omit<Invoice, 'id'>;
 export type FeeInvoice = { id: number; date: string; invoiceNumber: string; subjectId: number; grossAmount: number; taxRetention: number; netAmount: number; }
 export type FeeInvoiceData = Omit<FeeInvoice, 'id'>;
 
-export type Period = { value: string; label: string; }
+export type Period = { value: string; label: string; };
+
+export type PeriodStatus = {
+    id: number;
+    company_id: number;
+    period: string;
+    status: 'Abierto' | 'Cerrado';
+    closed_at?: string;
+    closed_by_id?: string;
+};
+export type PeriodStatusData = Omit<PeriodStatus, 'id'>;
 
 export type NavItemDefinition = {
     icon: string;
@@ -261,6 +272,7 @@ export type SessionContextType = {
     invoices: Invoice[];
     feeInvoices: FeeInvoice[];
     periods: Period[];
+    periodStatuses: PeriodStatus[];
     activeCompanyId: number | null;
     activePeriod: string;
     notifications: Notification[];
@@ -311,6 +323,8 @@ export type SessionContextType = {
     addFeeInvoice: (data: FeeInvoiceData) => Promise<void>;
     centralizePayslips: (period: string) => Promise<void>;
     importAndProcessPreviredData: (rows: ParsedPreviredRow[]) => Promise<{ employeesAdded: number; payslipsAdded: number }>;
+    closePeriod: (period: string) => Promise<void>;
+    reopenPeriod: (period: string) => Promise<void>;
     setActiveCompanyId: (id: number | null) => void;
     setActivePeriod: (period: string) => void;
     addNotification: (notification: Omit<Notification, 'id'>) => void;

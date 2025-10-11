@@ -1,13 +1,12 @@
-
 import React, { useState, useMemo } from 'react';
 import { Modal, Form, Table, Button } from 'react-bootstrap';
-import type { Account } from '../../types';
+import type { ChartOfAccount } from '../../types';
 
 interface AccountSearchModalProps {
     show: boolean;
     onHide: () => void;
-    onSelectAccount: (accountCode: string) => void;
-    accounts: Account[];
+    onSelectAccount: (account: ChartOfAccount) => void;
+    accounts: ChartOfAccount[];
 }
 
 export const AccountSearchModal: React.FC<AccountSearchModalProps> = ({ show, onHide, onSelectAccount, accounts }) => {
@@ -23,8 +22,8 @@ export const AccountSearchModal: React.FC<AccountSearchModalProps> = ({ show, on
         );
     }, [accounts, searchTerm]);
 
-    const handleSelect = (code: string) => {
-        onSelectAccount(code);
+    const handleSelect = (account: ChartOfAccount) => {
+        onSelectAccount(account);
         onHide();
     };
 
@@ -58,7 +57,7 @@ export const AccountSearchModal: React.FC<AccountSearchModalProps> = ({ show, on
                                 <td>{account.name}</td>
                                 <td>{account.type}</td>
                                 <td className="text-center">
-                                    <Button variant="primary" size="sm" onClick={() => handleSelect(account.code)}>
+                                    <Button variant="primary" size="sm" onClick={() => handleSelect(account)}>
                                         Seleccionar
                                     </Button>
                                 </td>

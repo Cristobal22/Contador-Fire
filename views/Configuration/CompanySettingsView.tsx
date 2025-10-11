@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
-import type { Company } from '../../types';
+import type { Company, ChartOfAccount } from '../../types';
 import { AccountSearchModal } from './AccountSearchModal';
 
 const initialFormData: Partial<Company> = {
@@ -12,6 +11,7 @@ const initialFormData: Partial<Company> = {
     final_date: '31/12/2024',
     profit_account: '',
     loss_account: '',
+    accumulated_result_account_id: undefined,
     invoices_to_collect_account: '',
     bills_to_collect_account: '',
     vat_account: '',
@@ -64,7 +64,7 @@ const AccountGroup: React.FC<AccountGroupProps> = ({ title, children, isOpen, on
 export const CompanySettingsView: React.FC = () => {
     const { companyId } = useParams<{ companyId: string }>();
     const navigate = useNavigate();
-    const { companies, accounts, updateCompany, addNotification, handleApiError } = useSession();
+    const { companies, chartOfAccounts, updateCompany, addNotification, handleApiError } = useSession();
     
     const [company, setCompany] = useState<Company | null>(null);
     const [formData, setFormData] = useState<Partial<Company>>(initialFormData);
@@ -119,15 +119,19 @@ export const CompanySettingsView: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleSelectAccount = (accountCode: string) => {
+    const handleSelectAccount = (account: ChartOfAccount) => {
         if (targetField) {
-            setFormData(prev => ({ ...prev, [targetField]: accountCode }));
+            if (targetField === 'accumulated_result_account_id') {
+                setFormData(prev => ({ ...prev, [targetField]: account.id }));
+            } else {
+                setFormData(prev => ({ ...prev, [targetField]: account.code }));
+            }
         }
     };
     
     const renderAccountInput = (label: string, name: keyof Company) => {
         const accountCode = formData[name] as string || '';
-        const account = accounts ? accounts.find(acc => acc.code === accountCode) : null;
+        const account = chartOfAccounts ? chartOfAccounts.find(acc => acc.code === accountCode) : null;
         const accountName = account ? account.name : '';
 
         return (
@@ -141,6 +145,34 @@ export const CompanySettingsView: React.FC = () => {
                             name={name} 
                             value={accountCode} 
                             onChange={handleInputChange}
+                            style={{ flex: '0 0 120px' }}
+                        />
+                        <button className="btn btn-outline-secondary d-flex align-items-center" type="button" onClick={() => handleOpenModal(name)}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>search</span>
+                        </button>
+                        <input type="text" className="form-control bg-light" readOnly value={accountName} />
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderAccountInputById = (label: string, name: keyof Company) => {
+        const accountId = formData[name] as number | undefined;
+        const account = chartOfAccounts ? chartOfAccounts.find(acc => acc.id === accountId) : null;
+        const accountCode = account ? account.code : '';
+        const accountName = account ? account.name : '';
+
+        return (
+            <div className="row mb-3 align-items-center">
+                <label className="col-lg-3 col-form-label">{label}:</label>
+                <div className="col-lg-9">
+                    <div className="input-group">
+                         <input 
+                            type="text" 
+                            className="form-control bg-light"
+                            value={accountCode} 
+                            readOnly
                             style={{ flex: '0 0 120px' }}
                         />
                         <button className="btn btn-outline-secondary d-flex align-items-center" type="button" onClick={() => handleOpenModal(name)}>
@@ -228,6 +260,7 @@ export const CompanySettingsView: React.FC = () => {
                     <AccountGroup title="Resultados" isOpen={openAccordion === 'Resultados'} onToggle={() => handleAccordionToggle('Resultados')}>
                         {renderAccountInput('Cuenta de Ganancia', 'profit_account')}
                         {renderAccountInput('Cuenta de Pérdida', 'loss_account')}
+                        {renderAccountInputById('Cta. Resultado Acumulado', 'accumulated_result_account_id')}
                     </AccountGroup>
 
                     <AccountGroup title="Ventas" isOpen={openAccordion === 'Ventas'} onToggle={() => handleAccordionToggle('Ventas')}>
@@ -252,40 +285,9 @@ export const CompanySettingsView: React.FC = () => {
                     <AccountGroup title="Ingresos Honorarios" isOpen={openAccordion === 'Ingresos Honorarios'} onToggle={() => handleAccordionToggle('Ingresos Honorarios')}>
                         {renderAccountInput('Clientes Honorarios', 'client_fees_account')}
                         {renderAccountInput('Retenciones por Pagar', 'retentions_to_pay_account')}
-                        {renderAccountInput('Retenciones por Cobrar', 'retenciones_to_collect_account')}
+                        {renderAccountInput('Retenciones por Cobrar', 'retentions_to_collect_account')}
                     </AccountGroup>
                     <AccountGroup title="Flujo Efectivo" isOpen={openAccordion === 'Flujo Efectivo'} onToggle={() => handleAccordionToggle('Flujo Efectivo')}>
                         {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account')}
                         {renderAccountInput('Cuenta Retiro Socio', 'partner_withdrawal_account')}
-                    </AccountGroup>
-                </div>
-                
-                <hr className="my-4"/>
-
-                <h5 className="mb-3">Firmas para Comprobantes Contables</h5>
-                <div className="row">
-                    <div className="col-md-4">
-                        <label className="form-label">Elaborado por:</label>
-                        <input type="text" className="form-control" name="made_by" value={formData.made_by || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="col-md-4">
-                        <label className="form-label">Revisado por:</label>
-                        <input type="text" className="form-control" name="reviewed_by" value={formData.reviewed_by || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="col-md-4">
-                        <label className="form-label">Aprobado por:</label>
-                        <input type="text" className="form-control" name="approved_by" value={formData.approved_by || ''} onChange={handleInputChange} />
-                    </div>
-                </div>
-
-            </div>
-
-            <AccountSearchModal 
-                show={isModalOpen} 
-                onHide={() => setIsModalOpen(false)} 
-                onSelectAccount={handleSelectAccount} 
-                accounts={accounts || []} 
-            />
-        </div>
-    );
-};
+                    </A
