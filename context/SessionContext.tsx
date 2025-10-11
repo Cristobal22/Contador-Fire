@@ -170,8 +170,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 setActiveCompanyId(null);
                 localStorage.removeItem('activeCompanyId');
             } else if (event === 'SIGNED_IN' && session?.user) {
-                 const userProfile = await getOrCreateUserProfile(session.user);
-                 if (userProfile) setCurrentUser(userProfile);
+                const userProfile = await getOrCreateUserProfile(session.user);
+                if (userProfile) {
+                    setCurrentUser(userProfile);
+                    const ownedCompanies = await fetchCompanies(userProfile.id);
+                    const storedCompanyId = localStorage.getItem('activeCompanyId');
+                    if (storedCompanyId && ownedCompanies.some(c => c.id === Number(storedCompanyId))) {
+                        setActiveCompanyId(Number(storedCompanyId));
+                    } else if (ownedCompanies.length > 0) {
+                        setActiveCompanyId(ownedCompanies[0].id);
+                    }
+                }
             }
         });
 
