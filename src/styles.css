@@ -1,0 +1,63 @@
+
+/* Estilos para el nuevo VoucherForm */
+
+/* Estilos para el buscador de cuentas */
+.searchable-dropdown {
+    position: relative;
+}
+
+.searchable-dropdown input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.dropdown-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    border-radius: 0 0 4px 4px;
+}
+
+.dropdown-item {
+    padding: 8px;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.dropdown-item-none {
+    padding: 8px;
+    color: var(--text-light-color);
+}
+
+
+/* Ajustes para la tabla de Vouchers */
+.voucher-table .col-account {
+    width: 40%;
+}
+
+.voucher-table .col-description {
+    width: 30%;
+}
+
+.voucher-table .col-amount {
+    width: 15%;
+    text-align: right;
+}
+
+.voucher-table .col-action {
+    width: 5%;
+    text-align: center;
+}

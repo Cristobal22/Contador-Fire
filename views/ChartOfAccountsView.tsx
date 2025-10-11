@@ -1,259 +1,205 @@
-import React, { useState } from 'react';
-import { useSession } from '../context/SessionContext';
-import { CrudView } from '../components/CrudView';
-import type { ChartOfAccount } from '../types';
-import Papa from 'papaparse'; // Library to parse CSV files
-import Modal from '../components/Modal'; // Import the new Modal component
 
+import React, { useState, useEffect } from 'react';
+import { useSession } from '../context/SessionContext';
+import type { ChartOfAccount, ChartOfAccountData } from '../types';
+import Modal from '../components/Modal';
+import Papa from 'papaparse';
+
+// --- Reusable Styles ---
 const styles: { [key: string]: React.CSSProperties } = {
-    container: {
-        padding: '2rem',
-    },
-    topActions: {
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginBottom: '1rem', 
-    },
-    importPanel: {
-        backgroundColor: '#f9f9f9',
-        border: '1px solid var(--border-color)',
-        borderRadius: '8px',
-        padding: '1.5rem',
-        marginBottom: '2rem',
-    },
-    panelTitle: {
-        margin: '0 0 1rem 0',
-        fontSize: '1.2rem',
-        fontWeight: 500,
-    },
-    formGroup: {
-        marginBottom: '1rem',
-    },
-    fileInput: {
-        display: 'block',
-        marginTop: '0.5rem',
-    },
-    button: {
-        marginRight: '1rem',
-        padding: '8px 16px',
-        cursor: 'pointer',
-    },
-    textLink: {
-        color: 'var(--primary-color)',
-        textDecoration: 'underline',
-        cursor: 'pointer',
-    },
-    smallText: {
-        color: 'var(--text-light-color)',
-        marginTop: '8px',
-        display: 'block'
-    },
-    warningText: {
-        color: '#f39c12', // A mild orange for warnings
-        fontWeight: 'bold',
-        display: 'block',
-        marginTop: '8px',
-    }
+    container: { padding: '2rem' },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' },
+    title: { margin: 0, fontSize: '1.8rem' },
+    table: { width: '100%', borderCollapse: 'collapse' },
+    th: { borderBottom: '2px solid var(--border-color)', padding: '12px', textAlign: 'left', color: 'var(--text-light-color)' },
+    td: { borderBottom: '1px solid var(--border-color)', padding: '12px', verticalAlign: 'middle' },
+    actions: { display: 'flex', gap: '10px' },
+    // Styles for the empty state / initial setup view
+    emptyStateContainer: { textAlign: 'center', padding: '4rem 2rem', backgroundColor: '#f8f9fa', borderRadius: '8px' },
+    emptyStateTitle: { fontSize: '1.5rem', marginBottom: '1rem' },
+    emptyStateText: { color: 'var(--text-light-color)', marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem auto' },
+    formGroup: { marginBottom: '1rem' },
+    label: { display: 'block', marginBottom: '0.5rem', fontWeight: 500 },
+    input: { width: '100%' },
 };
 
-const CHART_OF_ACCOUNTS_TEMPLATE_HEADERS = ['code', 'name', 'type'];
+// --- Account Form Component (for Create/Edit) ---
+const AccountForm: React.FC<{
+    account?: ChartOfAccount | null;
+    onSave: (data: ChartOfAccountData) => void;
+    onCancel: () => void;
+    isLoading: boolean;
+}> = ({ account, onSave, onCancel, isLoading }) => {
+    const [code, setCode] = useState(account?.code || '');
+    const [name, setName] = useState(account?.name || '');
+    const [type, setType] = useState(account?.type || 'Activo');
 
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!code || !name) return;
+        onSave({ code, name, type });
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div className="modal-body">
+                <div style={styles.formGroup}>
+                    <label style={styles.label}>Código</label>
+                    <input style={styles.input} type="text" value={code} onChange={e => setCode(e.target.value)} required />
+                </div>
+                <div style={styles.formGroup}>
+                    <label style={styles.label}>Nombre</label>
+                    <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} required />
+                </div>
+                <div style={styles.formGroup}>
+                    <label style={styles.label}>Tipo</label>
+                    <select style={styles.input} value={type} onChange={e => setType(e.target.value)} required>
+                        <option value="Activo">Activo</option>
+                        <option value="Pasivo">Pasivo</option>
+                        <option value="Patrimonio">Patrimonio</option>
+                        <option value="Ingreso">Ingreso</option>
+                        <option value="Gasto">Gasto</option>
+                        <option value="Costo">Costo</option>
+                    </select>
+                </div>
+            </div>
+            <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={isLoading}>{isLoading ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+        </form>
+    );
+};
+
+// --- Main Chart of Accounts View ---
 const ChartOfAccountsView = () => {
-    const session = useSession();
-    const [file, setFile] = useState<File | null>(null);
-    const [fileKey, setFileKey] = useState(Date.now()); // To reset file input
-    const [isModalOpen, setIsModalOpen] = useState(false); // State for modal visibility
+    const { chartOfAccounts, addChartOfAccount, updateChartOfAccount, deleteChartOfAccount, handleApiError, addNotification } = useSession();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(null);
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files.length > 0) {
-            setFile(event.target.files[0]);
+    const handleAddNew = () => {
+        setSelectedAccount(null);
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (account: ChartOfAccount) => {
+        setSelectedAccount(account);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id: number) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
+            try {
+                await deleteChartOfAccount(id);
+                addNotification({ type: 'success', message: 'Cuenta eliminada.' });
+            } catch (error) {
+                handleApiError(error, 'al eliminar la cuenta');
+            }
         }
     };
 
-    const handleDownloadTemplate = () => {
-        const csv = Papa.unparse([CHART_OF_ACCOUNTS_TEMPLATE_HEADERS]);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', 'plantilla_plan_de_cuentas.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const handleSave = async (data: ChartOfAccountData) => {
+        setIsLoading(true);
+        try {
+            if (selectedAccount) {
+                await updateChartOfAccount(selectedAccount.id, data);
+                addNotification({ type: 'success', message: 'Cuenta actualizada.' });
+            } else {
+                await addChartOfAccount(data);
+                addNotification({ type: 'success', message: 'Cuenta creada.' });
+            }
+            setIsModalOpen(false);
+        } catch (error) {
+            handleApiError(error, selectedAccount ? 'al actualizar la cuenta' : 'al crear la cuenta');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleLoadDefaultChartOfAccounts = () => {
-        if (!window.confirm('¿Estás seguro de que quieres reemplazar tu plan de cuentas actual con el predeterminado? Se borrarán todas las cuentas existentes.')) {
-            return;
-        }
-
+    // Special view for when the chart of accounts is empty
+    const handleLoadDefault = () => {
+        if (!window.confirm('¿Cargar el plan de cuentas predeterminado? Esta acción no se puede deshacer.')) return;
+        setIsLoading(true);
         fetch('/plan_de_cuentas_predeterminado.csv')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
+            .then(response => response.text())
             .then(csvText => {
                 Papa.parse(csvText, {
                     header: true,
                     skipEmptyLines: true,
                     complete: async (results) => {
-                        const accountsToImport = results.data as any[];
-
-                        if (!accountsToImport.length) {
-                            alert('El archivo de plan de cuentas predeterminado está vacío o no se pudo leer.');
-                            return;
-                        }
-
+                        const accountsToImport = results.data as ChartOfAccountData[];
                         try {
-                            // Delete all existing accounts for the current company
-                            if (session.chartOfAccounts && session.chartOfAccounts.length > 0) {
-                                for (const acc of session.chartOfAccounts) {
-                                    await session.deleteChartOfAccount(acc.id);
-                                }
-                            }
-                            
-                            // Add new accounts
                             for (const acc of accountsToImport) {
-                                if (acc.code && acc.name && acc.type) { // Basic validation
-                                    const newAccount: Omit<ChartOfAccount, 'id' | 'company_id'> = {
-                                        code: acc.code,
-                                        name: acc.name,
-                                        type: acc.type,
-                                    };
-                                    await session.addChartOfAccount(newAccount);
+                                if (acc.code && acc.name && acc.type) {
+                                    await addChartOfAccount(acc);
                                 }
                             }
-                            alert('¡Plan de cuentas predeterminado cargado con éxito!');
-                            setIsModalOpen(false); // Close modal on success
+                            addNotification({ type: 'success', message: 'Plan de cuentas predeterminado cargado.' });
                         } catch (error) {
-                            console.error("Error al cargar el plan de cuentas predeterminado:", error);
-                            alert('Hubo un error al cargar el plan de cuentas. Revise la consola para más detalles.');
+                           handleApiError(error, 'cargando el plan de cuentas');
                         }
                     },
-                    error: (error: any) => {
-                        alert('Ocurrió un error al procesar el archivo CSV predeterminado.');
-                        console.error("CSV Parsing Error:", error);
-                    }
                 });
             })
-            .catch(error => {
-                alert('No se pudo encontrar o cargar el archivo del plan de cuentas predeterminado (plan_de_cuentas_predeterminado.csv).');
-                console.error("Fetch error:", error);
-            });
+            .catch(err => handleApiError(err, 'cargando el archivo del plan de cuentas'))
+            .finally(() => setIsLoading(false));
     };
-
-    const handleImport = () => {
-        if (!file) {
-            alert('Por favor, seleccione un archivo primero.');
-            return;
-        }
-        
-        if (!window.confirm('¿Estás seguro de que quieres importar este archivo? Se reemplazarán todas las cuentas existentes.')) {
-            return;
-        }
-
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const accountsToImport = results.data as any[];
-
-                if (!accountsToImport.length || !CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.every(h => Object.keys(accountsToImport[0]).includes(h))) {
-                    alert(`El archivo no tiene el formato esperado. Asegúrese de que las columnas sean: ${CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.join(', ')}`);
-                    return;
-                }
-                
-                try {
-                     // Delete all existing accounts for the current company
-                     if (session.chartOfAccounts && session.chartOfAccounts.length > 0) {
-                        for (const acc of session.chartOfAccounts) {
-                            await session.deleteChartOfAccount(acc.id);
-                        }
-                    }
-
-                    // Add new accounts
-                    for (const acc of accountsToImport) {
-                        const newAccount: Omit<ChartOfAccount, 'id' | 'company_id'> = {
-                            code: acc.code,
-                            name: acc.name,
-                            type: acc.type,
-                        };
-                        await session.addChartOfAccount(newAccount);
-                    }
-                    alert('¡Cuentas importadas con éxito!');
-                    setIsModalOpen(false); // Close modal on success
-                } catch (error) {
-                    console.error("Error al importar cuentas:", error);
-                    alert('Hubo un error al importar las cuentas. Revise la consola para más detalles.');
-                } finally {
-                    setFile(null);
-                    setFileKey(Date.now()); // Reset file input
-                }
-            },
-            error: (error: any) => {
-                alert('Ocurrió un error al leer el archivo CSV.');
-                console.error("CSV Parsing Error:", error);
-            }
-        });
-    };
+    
+    if (!chartOfAccounts || chartOfAccounts.length === 0) {
+        return (
+            <div style={{...styles.container, ...styles.emptyStateContainer}}>
+                <h2 style={styles.emptyStateTitle}>Tu Plan de Cuentas está vacío</h2>
+                <p style={styles.emptyStateText}>Para empezar, puedes crear las cuentas una por una o cargar nuestro plan de cuentas predeterminado, basado en las mejores prácticas contables.</p>
+                <button className="btn btn-primary" style={{marginRight: '1rem'}} onClick={handleAddNew}>Crear Primera Cuenta</button>
+                <button className="btn btn-secondary" onClick={handleLoadDefault} disabled={isLoading}>{isLoading ? 'Cargando...': 'Cargar Plan Predeterminado'}</button>
+            </div>
+        );
+    }
 
     return (
         <div style={styles.container}>
-            <div style={styles.topActions}>
-                <button style={styles.button} onClick={() => setIsModalOpen(true)}>Modificar Plan de Cuentas</button>
+            <div style={styles.header}>
+                <h1 style={styles.title}>Plan de Cuentas</h1>
+                <button className="btn btn-primary" onClick={handleAddNew}><span className="material-symbols-outlined">add</span>Crear Nueva Cuenta</button>
             </div>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Modificar Plan de Cuentas">
-                <div style={styles.importPanel}>
-                    <h3 style={styles.panelTitle}>Cargar Plan de Cuentas Predeterminado</h3>
-                    <p>
-                        Puedes cargar un plan de cuentas estándar basado en las mejores prácticas contables.
-                    </p>
-                    <small style={styles.warningText}>
-                        Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
-                    </small>
-                    <br />
-                    <button style={styles.button} onClick={handleLoadDefaultChartOfAccounts}>Cargar Plan Predeterminado</button>
-                </div>
+            <table style={styles.table}>
+                <thead>
+                    <tr>
+                        <th style={styles.th}>Código</th>
+                        <th style={styles.th}>Nombre</th>
+                        <th style={styles.th}>Tipo</th>
+                        <th style={styles.th}></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {chartOfAccounts.map(account => (
+                        <tr key={account.id}>
+                            <td style={styles.td}>{account.code}</td>
+                            <td style={styles.td}>{account.name}</td>
+                            <td style={styles.td}>{account.type}</td>
+                            <td style={{...styles.td, textAlign: 'right'}}>
+                                <div style={styles.actions}>
+                                    <button className="btn-icon" onClick={() => handleEdit(account)} title="Editar"><span className="material-symbols-outlined">edit</span></button>
+                                    <button className="btn-icon" onClick={() => handleDelete(account.id)} title="Eliminar"><span className="material-symbols-outlined">delete</span></button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
 
-                <div style={styles.importPanel}>
-                    <h3 style={styles.panelTitle}>Importar Plan de Cuentas Personalizado</h3>
-                    <p>
-                        O puedes cargar masivamente tu plan de cuentas usando un archivo CSV.
-                        <span onClick={handleDownloadTemplate} style={styles.textLink}> Descargar plantilla</span>.
-                    </p>
-                    <div style={styles.formGroup}>
-                        <label>Cargar archivo de plan de cuentas (.csv)</label>
-                        <input type="file" key={fileKey} accept=".csv" style={styles.fileInput} onChange={handleFileChange} />
-                        <small style={styles.smallText}>
-                            Formato esperado: {CHART_OF_ACCOUNTS_TEMPLATE_HEADERS.join(', ')}
-                        </small>
-                        <small style={styles.warningText}>
-                            Atención: Esta acción reemplazará todas las cuentas existentes en la empresa actual.
-                        </small>
-                    </div>
-                    <button style={styles.button} onClick={handleImport} disabled={!file}>Importar Cuentas</button>
-                </div>
-            </Modal>
-
-            <CrudView<ChartOfAccount>
-                title="Cuenta"
-                columns={[
-                    { key: 'code', header: 'Código' },
-                    { key: 'name', header: 'Nombre' },
-                    { key: 'type', header: 'Tipo' }
-                ]}
-                data={session.chartOfAccounts || []}
-                onSave={(acc) => session.addChartOfAccount(acc as Omit<ChartOfAccount, 'id' | 'company_id'>)}
-                onUpdate={session.updateChartOfAccount}
-                onDelete={session.deleteChartOfAccount}
-                formFields={[
-                    { name: 'code', label: 'Código', type: 'text' },
-                    { name: 'name', label: 'Nombre', type: 'text' },
-                    { name: 'type', label: 'Tipo', type: 'select', options: ['Activo', 'Pasivo', 'Patrimonio', 'Resultado'] }
-                ]}
-            />
+            {isModalOpen && (
+                 <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedAccount ? 'Editar Cuenta' : 'Crear Cuenta'}>
+                    <AccountForm 
+                        account={selectedAccount}
+                        onSave={handleSave}
+                        onCancel={() => setIsModalOpen(false)}
+                        isLoading={isLoading}
+                    />
+                </Modal>
+            )}
         </div>
     );
 };

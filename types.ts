@@ -142,5 +142,77 @@ export type User = {
 };
 export type UserData = Omit<User, 'id'>;
 
-// ... (rest of the file remains the same)
+// --- Accounting specific types ---
+
+export type VoucherEntry = {
+    id: number;
+    accountId: number | '';
+    debit: number;
+    credit: number;
+    description?: string;
+};
+export type VoucherEntryData = Omit<VoucherEntry, 'id'>;
+
+export type Voucher = {
+    id: number;
+    company_id: number;
+    date: string;
+    type: string;
+    description: string;
+    entries: VoucherEntry[];
+};
+export type VoucherData = Omit<Voucher, 'id' | 'company_id'>;
+
+
+// --- New, detailed Invoice structure ---
+
+export type TaxType = 'afecto' | 'exento';
+
+export type InvoiceLine = {
+    id: number;
+    description: string;
+    quantity: number;
+    price: number;
+    accountId: number;
+};
+export type InvoiceLineData = Omit<InvoiceLine, 'id'>;
+
+export type Invoice = {
+    id: number;
+    company_id: number;
+    date: string;
+    type: 'Compra' | 'Venta';
+    invoiceNumber: string;
+    subjectId: number;
+    taxType: TaxType;
+    lines: InvoiceLine[];
+    subtotal: number;
+    tax: number;
+    total: number;
+};
+
+// This is the data that will be sent from the new form
+export type InvoiceData = {
+    date: string;
+    type: 'Compra' | 'Venta';
+    invoiceNumber: string;
+    subjectId: number;
+    taxType: TaxType;
+    lines: InvoiceLineData[];
+};
+
+
+// --- Fee Invoice (Boleta de Honorarios) --- 
+
+export type FeeInvoice = {
+    id: number;
+    date: string;
+    invoiceNumber: string;
+    subjectId: number;
+    grossAmount: number;
+    taxRetention: number;
+    netAmount: number;
+};
+
+export type FeeInvoiceData = Omit<FeeInvoice, 'id'>;
 
