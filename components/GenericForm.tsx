@@ -29,11 +29,19 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
         reset(initialData || {});
     }, [initialData, reset]);
 
+    // Esta es la función que se ejecutará en el submit.
+    // handleSubmit de react-hook-form se encarga de prevenir el default y pasar los datos.
+    const handleFormSubmit = (data: any) => {
+        if (onSave) {
+            onSave(data);
+        }
+    };
+
     const renderField = (field: FormField) => {
         const commonProps = {
             ...register(field.name),
             id: field.name,
-            className: 'form-control', // Asume una clase bootstrap-like
+            className: 'form-control',
         };
 
         switch (field.type) {
@@ -53,7 +61,7 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
                 );
 
             case 'number':
-                return <input type="number" {...commonProps} />;
+                return <input type="number" {...commonProps} step="any" />; // step="any" para permitir decimales
             
             case 'date':
                  return <input type="date" {...commonProps} />;
@@ -65,7 +73,8 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
     };
 
     return (
-        <form onSubmit={handleSubmit(onSave)}>
+        // Aquí está la corrección clave: handleSubmit envuelve nuestra propia función.
+        <form onSubmit={handleSubmit(handleFormSubmit)}>
             <div className="modal-body">
                 {fields.map(field => (
                     <div key={field.name} className="form-group" style={{ marginBottom: '1rem' }}>
