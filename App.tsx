@@ -86,23 +86,29 @@ const NotificationContainer = () => {
 const Header = ({ onSearchClick }: { onSearchClick: () => void }) => {
     const { session, logout } = useSession();
 
-    if (!session) return null; // No renderizar si no hay sesión
+    if (!session) return null;
 
     const { user, company, periods, activePeriod, setActivePeriod } = session;
+    const isSystemAdmin = user.role === 'System Administrator';
 
     return (
         <header className="app-header">
             <div className="header-selectors">
-                <div className="selector-wrapper">
-                    <span className="material-symbols-outlined">business</span>
-                    <span style={{marginLeft: '8px', fontWeight: 500}}>{company.name}</span>
-                </div>
-                 <div className="selector-wrapper">
-                    <span className="material-symbols-outlined">calendar_month</span>
-                    <select value={activePeriod} onChange={(e) => setActivePeriod(e.target.value)} className="selector">
-                        {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
-                </div>
+                {company && (
+                    <div className="selector-wrapper">
+                        <span className="material-symbols-outlined">business</span>
+                        <span style={{marginLeft: '8px', fontWeight: 500}}>{company.name}</span>
+                    </div>
+                )}
+                {periods && periods.length > 0 && (
+                     <div className="selector-wrapper">
+                        <span className="material-symbols-outlined">calendar_month</span>
+                        <select value={activePeriod} onChange={(e) => setActivePeriod(e.target.value)} className="selector">
+                            {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        </select>
+                    </div>
+                )}
+                 {isSystemAdmin && <span style={{marginLeft: '16px', fontWeight: 500, color: 'var(--text-light-color)'}}>Modo Administrador</span>}
             </div>
             <div className="user-profile">
                  <button className="btn-icon" title="Buscar" onClick={onSearchClick} style={{marginRight: '8px'}}>
@@ -129,7 +135,7 @@ const AppLayout = () => {
     const isSystemAdmin = session.user.role === 'System Administrator';
     const currentNavStructure = isSystemAdmin ? adminNavStructure : navStructure;
 
-    const breadcrumb = getPathBreadcrumb(location.pathname, currentNavStructure) || 'Dashboard';
+    const breadcrumb = getPathBreadcrumb(location.pathname, currentNavStructure) || (isSystemAdmin ? 'Admin Dashboard' : 'Dashboard');
     const title = breadcrumb.split(' > ').pop();
 
     return (
@@ -165,26 +171,21 @@ const AuthWrapper = () => {
             <Route path="/login" element={!session ? <LoginView /> : <Navigate to="/" />} />
             <Route path="/update-password" element={<UpdatePasswordView />} />
             <Route path="/" element={session ? <AppLayout /> : <Navigate to="/login" />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                 <Route index element={<Navigate to={session?.user?.role === 'System Administrator' ? '/admin/users' : '/dashboard'} replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
                 
-                {session && session.user.role !== 'System Administrator' && (
-                    <>
-                        {/* Rutas de la aplicación principal */}
-                        <Route path="contabilidad/movimientos/comprobantes" element={<VouchersView />} />
-                        <Route path="contabilidad/movimientos/compras" element={<InvoicesView type="Compra" />} />
-                        <Route path="contabilidad/movimientos/ventas" element={<InvoicesView type="Venta" />} />
-                        <Route path="contabilidad/maestros/plan-de-cuentas" element={<ChartOfAccountsView />} />
-                        <Route path="remuneraciones/movimientos/ficha-de-personal" element={<EmployeesView />} />
-                        <Route path="remuneraciones/movimientos/liquidaciones" element={<PayslipsView />} />
-                        <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
-                        {/* ... más rutas ... */}
-                    </>
-                )}
+                {/* Rutas de la aplicación principal */}
+                <Route path="contabilidad/movimientos/comprobantes" element={<VouchersView />} />
+                <Route path="contabilidad/movimientos/compras" element={<InvoicesView type="Compra" />} />
+                <Route path="contabilidad/movimientos/ventas" element={<InvoicesView type="Venta" />} />
+                <Route path="contabilidad/maestros/plan-de-cuentas" element={<ChartOfAccountsView />} />
+                <Route path="remuneraciones/movimientos/ficha-de-personal" element={<EmployeesView />} />
+                <Route path="remuneraciones/movimientos/liquidaciones" element={<PayslipsView />} />
+                <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
+                {/* ... más rutas ... */}
                 
-                {session && session.user.role === 'System Administrator' && (
-                    <Route path="admin/users" element={<AdminUsersView />} />
-                )}
+                {/* Rutas de Admin */}
+                <Route path="admin/users" element={<AdminUsersView />} />
                 
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

@@ -3,8 +3,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '../supabaseClient';
 import type { Session, User, Company, Employee, Institution, MonthlyParameter, Payslip, Period, Notification } from '../types';
 
-// El tipo para el valor del contexto ahora incluye las funciones de autenticación y el estado de carga,
-// permitiendo que la sesión (los datos) sea nula.
 interface SessionContextValue {
     session: Session | null;
     loading: boolean;
@@ -30,41 +28,47 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const handleApiError = useCallback((error: any, context: string) => {
         console.error(`Error ${context}:`, error);
-        addNotification({ type: 'error', message: error.message || `Error ${context}.` });
-        // Lanzar el error para que el que llama pueda manejarlo si es necesario
+        const message = (error instanceof Error) ? error.message : `Error ${context}.`;
+        addNotification({ type: 'error', message });
         throw error;
     }, [addNotification]);
 
-    // --- FUNCIONES DE AUTENTICACIÓN ---
     const login = useCallback(async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-             handleApiError(error, 'al iniciar sesión');
-        }
+        if (error) handleApiError(error, 'al iniciar sesión');
     }, [handleApiError]);
 
     const logout = useCallback(async () => {
         const { error } = await supabase.auth.signOut();
-        if (error) {
-            handleApiError(error, 'al cerrar sesión');
-        } else {
-            setSession(null);
-        }
+        if (error) handleApiError(error, 'al cerrar sesión');
+        else setSession(null);
     }, [handleApiError]);
 
     const sendPasswordResetEmail = useCallback(async (email: string) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin + '/update-password',
         });
-        if (error) {
-            handleApiError(error, 'al enviar correo de recuperación');
-        }
+        if (error) handleApiError(error, 'al enviar correo de recuperación');
     }, [handleApiError]);
 
-    // --- CARGA DE DATOS DE LA SESIÓN ---
     const loadAllData = useCallback(async (user: User) => {
         setLoading(true);
         try {
+            // Un administrador del sistema no pertenece a una empresa y tiene una sesión ligera.
+            if (user.role === 'System Administrator') {
+                setSession({
+                    user,
+                    company: null, periods: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
+                    activePeriod: '', setActivePeriod: () => {},
+                    addEmployee: async () => {}, updateEmployee: async () => {}, deleteEmployee: async () => {},
+                    addInstitution: async () => {}, updateInstitution: async () => {}, deleteInstitution: async () => {},
+                    addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
+                    addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
+                });
+                return;
+            }
+
+            // Para usuarios normales, se requiere un perfil y una empresa.
             const { data: profile, error: profileError } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
             if (profileError || !profile?.company_id) throw new Error('Perfil de usuario o empresa no encontrado.');
             const companyId = profile.company_id;
@@ -79,9 +83,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ]);
 
             const responses = [companyRes, periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes];
-            for (const res of responses) {
-                if (res.error) throw res.error;
-            }
+            for (const res of responses) if (res.error) throw res.error;
             
             const createCrud = <T extends { id: any }>(table: string) => ({
                 add: async (data: Omit<T, 'id' | 'company_id'>) => { await supabase.from(table).insert({ ...data, company_id: companyId }); },
@@ -91,26 +93,15 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             setSession({
                 user,
-                company: companyRes.data as Company,
-                periods: periodsRes.data as Period[] || [],
-                employees: employeesRes.data as Employee[] || [],
-                institutions: institutionsRes.data as Institution[] || [],
-                monthlyParameters: monthlyParamsRes.data as MonthlyParameter[] || [],
-                payslips: payslipsRes.data as Payslip[] || [],
+                company: companyRes.data as Company, periods: periodsRes.data as Period[] || [],
+                employees: employeesRes.data as Employee[] || [], institutions: institutionsRes.data as Institution[] || [],
+                monthlyParameters: monthlyParamsRes.data as MonthlyParameter[] || [], payslips: payslipsRes.data as Payslip[] || [],
                 activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
                 setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
-                addEmployee: createCrud<Employee>('employees').add,
-                updateEmployee: createCrud<Employee>('employees').update,
-                deleteEmployee: createCrud<Employee>('employees').delete,
-                addInstitution: createCrud<Institution>('institutions').add,
-                updateInstitution: createCrud<Institution>('institutions').update,
-                deleteInstitution: createCrud<Institution>('institutions').delete,
-                addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add,
-                updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update,
-                deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,
-                addPayslip: createCrud<Payslip>('payslips').add,
-                updatePayslip: createCrud<Payslip>('payslips').update,
-                deletePayslip: createCrud<Payslip>('payslips').delete,
+                addEmployee: createCrud<Employee>('employees').add, updateEmployee: createCrud<Employee>('employees').update, deleteEmployee: createCrud<Employee>('employees').delete,
+                addInstitution: createCrud<Institution>('institutions').add, updateInstitution: createCrud<Institution>('institutions').update, deleteInstitution: createCrud<Institution>('institutions').delete,
+                addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add, updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update, deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,
+                addPayslip: createCrud<Payslip>('payslips').add, updatePayslip: createCrud<Payslip>('payslips').update, deletePayslip: createCrud<Payslip>('payslips').delete,
             });
         } catch (error) {
             handleApiError(error, "cargando los datos de la sesión");
@@ -120,50 +111,34 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [handleApiError, logout]);
 
-    // --- EFECTO PRINCIPAL DE AUTENTICACIÓN ---
     useEffect(() => {
+        const initialLoad = async () => {
+            const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+            if (supabaseSession) await loadAllData(supabaseSession.user as User);
+            else setLoading(false);
+        };
+        initialLoad();
+
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
             if (event === 'SIGNED_IN' && supabaseSession?.user) {
                 await loadAllData(supabaseSession.user as User);
-                 addNotification({ type: 'success', message: `Sesión iniciada.` });
+                addNotification({ type: 'success', message: `Sesión iniciada.` });
             } else if (event === 'SIGNED_OUT') {
                 setSession(null);
                 setLoading(false);
             }
         });
-        
-        // Comprobar sesión existente al cargar la app
-        supabase.auth.getSession().then(({ data: { session: supabaseSession }}) => {
-            if (supabaseSession) {
-                loadAllData(supabaseSession.user as User);
-            } else {
-                setLoading(false);
-            }
-        })
 
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
+        return () => { authListener.subscription.unsubscribe(); };
     }, [loadAllData, addNotification]);
 
-    const value: SessionContextValue = {
-        session,
-        loading,
-        notifications,
-        addNotification,
-        login,
-        logout,
-        sendPasswordResetEmail,
-    };
+    const value: SessionContextValue = { session, loading, notifications, addNotification, login, logout, sendPasswordResetEmail };
 
     return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 };
 
-// El hook ahora devuelve el tipo correcto que puede ser nulo
 export const useSession = (): SessionContextValue => {
     const context = useContext(SessionContext);
-    if (!context) {
-        throw new Error('useSession must be used within a SessionProvider');
-    }
+    if (!context) throw new Error('useSession must be used within a SessionProvider');
     return context;
 };
