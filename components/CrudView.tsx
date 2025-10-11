@@ -1,11 +1,19 @@
 
 import React, { useState } from 'react';
 import Modal from './Modal';
-import { GenericForm } from './GenericForm'; // Updated import path
+import { GenericForm } from './GenericForm';
 import { useSession } from '../context/SessionContext';
 import { validateRut } from '../utils/format';
 
-// Props definition remains the same
+// Define a more specific type for form fields, including optional keys for object-based selects
+interface FormField {
+    name: string;
+    label: string;
+    type: string;
+    options?: any[];
+    displayKey?: string; // Optional: The key to display for an object option
+    valueKey?: string;   // Optional: The key to use as the value for an object option
+}
 
 type CrudViewProps<T extends { id: number | string }> = {
     title: string;
@@ -18,18 +26,16 @@ type CrudViewProps<T extends { id: number | string }> = {
     onSave: (data: Omit<T, 'id'>) => Promise<void>;
     onUpdate: (data: T) => Promise<void>;
     onDelete: (id: number | string) => Promise<void>;
-    formFields: { name: string, label: string, type: string, options?: any[] }[];
+    formFields: FormField[]; // Use the enhanced FormField type
 };
 
 export const CrudView = <T extends { id: number | string }>({ title, columns, data, onSave, onUpdate, onDelete, formFields }: CrudViewProps<T>) => {
     const { addNotification, handleApiError } = useSession();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    // The type for editingItem is now simplified, as GenericForm handles the initial empty state
     const [editingItem, setEditingItem] = useState<T | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleAddNew = () => {
-        // The new GenericForm can handle a null initialData, simplifying this.
         setEditingItem(null);
         setIsModalOpen(true);
     };
@@ -50,15 +56,13 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
         }
     };
 
-    // This function now receives the data directly from the new GenericForm's handleSubmit
     const handleSave = async (formData: T) => {
         setIsLoading(true);
         const isEditing = editingItem !== null;
 
-        // RUT validation remains the same
         if ('rut' in formData && typeof (formData as any).rut === 'string' && (formData as any).rut) {
             if (!validateRut((formData as any).rut)) {
-                addNotification({ type: 'error', message: 'El RUT ingresado no es válido. Verifique el RUT y el dígito verificador.' });
+                addNotification({ type: 'error', message: 'El RUT ingresado no es válido.' });
                 setIsLoading(false);
                 return;
             }
@@ -66,7 +70,6 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
         
         try {
             if (isEditing) {
-                // The new form returns the full object, so we pass it directly
                 await onUpdate({ ...editingItem, ...formData });
             } else {
                 await onSave(formData as Omit<T, 'id'>);
@@ -86,7 +89,6 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
         setEditingItem(null);
     };
 
-    // The initialData passed to GenericForm is now either the item to edit or null
     const initialDataForForm = editingItem ? editingItem : 
         formFields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {});
 
@@ -105,7 +107,6 @@ export const CrudView = <T extends { id: number | string }>({ title, columns, da
                 </tbody>
             </table>
             <Modal isOpen={isModalOpen} onClose={handleCancel} title={(editingItem ? 'Editar' : 'Agregar') + ` ${title}`}>
-                {/* The key prop is added to ensure the form remounts and resets its state when the editing item changes */}
                 <GenericForm 
                     key={editingItem ? editingItem.id : 'new'} 
                     onSave={handleSave} 
