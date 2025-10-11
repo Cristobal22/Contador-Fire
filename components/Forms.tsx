@@ -3,17 +3,17 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from '../context/SessionContext';
 import { formatRut } from '../utils/format';
 import { voucherTypes, feeInvoiceTaxRetentionRates } from '../data/accounting';
-import type { VoucherData, VoucherEntry, InvoiceData, FeeInvoiceData, Voucher, Subject, ChartOfAccount, InvoiceLineData, TaxType } from '../types';
+import type { VoucherData, VoucherEntry, InvoiceData, FeeInvoiceData, Voucher, Subject, ChartOfAccount, InvoiceLineData, TaxType, FormProps } from '../types';
 
 // --- Reusable Generic Components (already defined) ---
-const SaveButton: React.FC<{ isLoading?: boolean; text?: string; disabled?: boolean; }> = ({ isLoading, text = "Guardar", disabled = false }) => (/* ... */);
-const SearchableDropdown: React.FC<{ /* ... */ }> = ({ items, value, onChange, placeholder, displayKey }) => (/* ... */);
+const SaveButton: React.FC<{ isLoading?: boolean; text?: string; disabled?: boolean; }> = ({ isLoading, text = "Guardar", disabled = false }) => null;
+const SearchableDropdown: React.FC<{ items: any[], value: any, onChange: (value: any) => void, placeholder?: string, displayKey: string }> = ({ items, value, onChange, placeholder, displayKey }) => null;
 
 // --- VOUCHER FORM (already defined) ---
-export const VoucherForm: React.FC<{ /* ... */ }> = ({ onSave, onCancel, isLoading, initialData }) => (/* ... */);
+export const VoucherForm: React.FC<{ onSave: (data: VoucherData) => void, onCancel: () => void, isLoading?: boolean, initialData?: Voucher | null }> = ({ onSave, onCancel, isLoading, initialData }) => null;
 
 // --- INVOICE FORM (already defined) ---
-export const InvoiceForm: React.FC<{ /* ... */ }> = ({ onSave, type, onCancel, isLoading }) => (/* ... */);
+export const InvoiceForm: React.FC<{ onSave: (data: InvoiceData) => void, type: 'Compra' | 'Venta', onCancel: () => void, isLoading?: boolean }> = ({ onSave, type, onCancel, isLoading }) => null;
 
 
 // --- FEE INVOICE FORM (Newly Rebuilt) ---
@@ -96,4 +96,5 @@ export const FeeInvoiceForm: React.FC<{
 // --- GENERIC FORM (remains unchanged) ---
 export const GenericForm: React.FC<{ onSave: (data: any) => void; } & FormProps> = ({ onSave, onCancel, isLoading, fields, initialData }) => {
     // ... existing code ...
+    return null;
 };
