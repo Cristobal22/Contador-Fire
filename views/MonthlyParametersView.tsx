@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
@@ -5,7 +6,9 @@ import type { MonthlyParameter } from '../types';
 
 const MonthlyParametersView = () => {
     const session = useSession();
-    const periodOptions = session.periods.map(p => ({ value: p.value, label: p.label }));
+
+    // Defensive check for periods
+    const periodOptions = session.periods ? session.periods.map(p => ({ value: p.value, label: p.label })) : [];
 
     return (
         <CrudView<MonthlyParameter>
@@ -15,7 +18,7 @@ const MonthlyParametersView = () => {
                 { key: 'name', header: 'Nombre' },
                 { key: 'value', header: 'Valor' }
             ]}
-            data={session.monthlyParameters}
+            data={session.monthlyParameters || []} // Fallback to empty array
             onSave={session.addMonthlyParameter}
             onUpdate={session.updateMonthlyParameter}
             onDelete={session.deleteMonthlyParameter}

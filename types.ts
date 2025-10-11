@@ -142,6 +142,16 @@ export type User = {
 };
 export type UserData = Omit<User, 'id'>;
 
+export type MonthlyParameter = {
+    id: number;
+    company_id: number;
+    period: string;
+    name: 'UF' | 'UTM' | 'IPC' | 'Tope Imponible';
+    value: number;
+};
+export type MonthlyParameterData = Omit<MonthlyParameter, 'id' | 'company_id'>;
+
+
 // --- Accounting specific types ---
 
 export type VoucherEntry = {
@@ -215,4 +225,3 @@ export type FeeInvoice = {
 };
 
 export type FeeInvoiceData = Omit<FeeInvoice, 'id'>;
-

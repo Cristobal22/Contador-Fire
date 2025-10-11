@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { unformatRut } from '../utils/format';
 import type { 
     User, Company, CompanyData, ChartOfAccount, ChartOfAccountData, Subject, SubjectData, 
-    CostCenter, CostCenterData, Item, ItemData, Notification, Voucher
+    CostCenter, CostCenterData, Item, ItemData, Notification, Voucher, MonthlyParameter, MonthlyParameterData 
 } from '../types';
 
 
@@ -24,6 +24,7 @@ interface SessionContextType {
     vouchers: Voucher[];
     periods: { label: string; value: string; }[];
     activePeriod: string;
+    monthlyParameters: MonthlyParameter[];
     login: (email: string, pass: string) => Promise<User>;
     logout: () => void;
     sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -44,6 +45,10 @@ interface SessionContextType {
     addItem: (data: ItemData) => Promise<void>;
     updateItem: (id: number, data: ItemData) => Promise<void>;
     deleteItem: (id: number) => Promise<void>;
+    addMonthlyParameter: (data: MonthlyParameterData) => Promise<void>;
+    updateMonthlyParameter: (id: number, data: MonthlyParameterData) => Promise<void>;
+    deleteMonthlyParameter: (id: number) => Promise<void>;
+
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -58,6 +63,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [periods, setPeriods] = useState<{ label: string; value: string; }[]>([]);
     const [activePeriod, setActivePeriod] = useState<string>('');
+    const [monthlyParameters, setMonthlyParameters] = useState<MonthlyParameter[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [notifications, setNotifications] = useState<(Notification & { id: number })[]>([]);
     const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(null);
@@ -147,6 +153,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 fetchAndSet('cost_centers', setCostCenters),
                 fetchAndSet('items', setItems),
                 fetchAndSet('vouchers', setVouchers),
+                fetchAndSet('monthly_parameters', setMonthlyParameters),
             ]);
         } catch (error) {
             handleApiError(error, 'al sincronizar datos');
@@ -310,6 +317,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const updateItem = (id: number, data: ItemData) => crudOperation('items', 'update', id, data);
     const deleteItem = (id: number) => crudOperation('items', 'delete', id);
 
+    const addMonthlyParameter = (data: MonthlyParameterData) => crudOperation('monthly_parameters', 'insert', undefined, data);
+    const updateMonthlyParameter = (id: number, data: MonthlyParameterData) => crudOperation('monthly_parameters', 'update', id, data);
+    const deleteMonthlyParameter = (id: number) => crudOperation('monthly_parameters', 'delete', id);
+
     const addCompany = async (companyData: CompanyData) => {
         if (!currentUser) throw new Error("Usuario no autenticado.");
         const { data, error } = await supabase.from('companies').insert([{ ...companyData, owner_id: currentUser.id }]).select();
@@ -333,13 +344,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const contextValue = {
         currentUser, companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading, notifications,
-        accounts, subjects, costCenters, items, vouchers, periods, activePeriod,
+        accounts, subjects, costCenters, items, vouchers, periods, activePeriod, monthlyParameters,
         login, logout, sendPasswordResetEmail, addNotification, handleApiError,
         addCompany, updateCompany, deleteCompany,
         addChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
         addSubject, updateSubject, deleteSubject,
         addCostCenter, updateCostCenter, deleteCostCenter,
         addItem, updateItem, deleteItem,
+        addMonthlyParameter, updateMonthlyParameter, deleteMonthlyParameter,
     };
 
     return (
