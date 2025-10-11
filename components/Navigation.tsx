@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, ChangeEvent } from 'react';
+import React, { useState, useCallback, ChangeEvent, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { NavStructure, NavItemDefinition } from '../types';
 import { useSession } from '../context/SessionContext';
