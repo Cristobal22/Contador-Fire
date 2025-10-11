@@ -40,7 +40,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [handleApiError]);
 
     const loadAllData = useCallback(async (authUser: SupabaseUser) => {
-        setLoading(true);
         try {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
@@ -64,7 +63,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
                     addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
                 });
-                setLoading(false);
                 return;
             }
 
@@ -124,7 +122,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } finally {
             setLoading(false);
         }
-    }, [handleApiError, logout, addNotification]);
+    }, [handleApiError, logout]);
     
     const login = useCallback(async (email: string, password: string) => {
         setLoading(true);
@@ -145,38 +143,27 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     useEffect(() => {
         setLoading(true);
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
-            if (event === 'SIGNED_IN' && supabaseSession?.user) {
-                await loadAllData(supabaseSession.user);
-                addNotification({ type: 'success', message: 'Sesión iniciada.' });
-            } else if (event === 'SIGNED_OUT') {
-                setSession(null);
-                setLoading(false);
-            } else if (event === 'INITIAL_SESSION') {
-                if (supabaseSession?.user) {
-                    await loadAllData(supabaseSession.user);
-                } else {
-                    setLoading(false);
-                }
-            } else if (event === 'USER_UPDATED') {
-                if (supabaseSession?.user) {
-                    await loadAllData(supabaseSession.user);
-                }
-            }
-        });
 
-        const initialLoad = async () => {
-            const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+        supabase.auth.getSession().then(({ data: { session: supabaseSession } }) => {
             if (supabaseSession?.user) {
-                await loadAllData(supabaseSession.user);
+                loadAllData(supabaseSession.user);
             } else {
                 setLoading(false);
             }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
+            if (event === 'SIGNED_IN' && supabaseSession?.user) {
+                addNotification({ type: 'success', message: 'Sesión iniciada.' });
+                await loadAllData(supabaseSession.user);
+            } else if (event === 'SIGNED_OUT') {
+                setSession(null);
+            }
+        });
+
+        return () => {
+            subscription?.unsubscribe();
         };
-
-        initialLoad();
-
-        return () => { authListener.subscription.unsubscribe(); };
     }, [loadAllData, addNotification]);
 
     const value: SessionContextValue = { session, loading, notifications, addNotification, login, logout, sendPasswordResetEmail };
