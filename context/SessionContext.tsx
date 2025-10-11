@@ -198,24 +198,101 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
         const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
             if (!session) {
-                // Clear all data on logout
+                // This is handled by the logout function now
             }
         });
 
         return () => authListener.subscription.unsubscribe();
     }, []);
 
+    const login = async (email: string, pass: string): Promise<User> => {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        if (!data.user) throw new Error("Authentication failed: User not found.");
+
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+            
+        if (profileError) {
+            await supabase.auth.signOut(); // Log out if profile is inaccessible
+            throw profileError;
+        }
+
+        setCurrentUser(userProfile);
+        
+        // Fetch global and user-specific data
+        await fetchAndSetData('institutions', setInstitutions);
+        
+        if (userProfile.role === 'System Administrator') {
+            await fetchAndSetData('users', setUsers);
+            await fetchAndSetData('companies', setCompanies);
+        } else {
+             const { data: userCompanies, error: companyError } = await supabase
+                .from('companies')
+                .select('*')
+                .eq('owner_id', userProfile.id);
+            if(companyError) throw companyError;
+            setCompanies(userCompanies || []);
+        }
+
+        const storedCompanyId = localStorage.getItem('activeCompanyId');
+        if (storedCompanyId) {
+            const companyId = parseInt(storedCompanyId, 10);
+            setActiveCompanyIdState(companyId);
+            await fetchDataForCompany(companyId);
+        }
+        
+        return userProfile;
+    };
+
+    const logout = async () => {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setCompanies([]);
+        setChartOfAccounts([]);
+        setSubjects([]);
+        setCostCenters([]);
+        setItems([]);
+        setEmployees([]);
+        // Institutions are global, no need to clear if you want to keep them for the login screen
+        // setInstitutions([]); 
+        setMonthlyParameters([]);
+        setVouchers([]);
+        setInvoices([]);
+        setFeeInvoices([]);
+        setWarehouseMovements([]);
+        setPayslips([]);
+        setUsers([]);
+        setAccountGroups([]);
+        setFamilyAllowanceBrackets([]);
+        setIncomeTaxBrackets([]);
+        setPeriodStatuses([]);
+        setActiveCompanyIdState(null);
+        localStorage.clear();
+        addNotification({ type: 'info', message: 'Sesión cerrada.' });
+    };
+
     const setActiveCompanyId = (id: number | null) => {
         setActiveCompanyIdState(id);
-        localStorage.setItem('activeCompanyId', String(id));
         if (id) {
+            localStorage.setItem('activeCompanyId', String(id));
             fetchDataForCompany(id);
+        } else {
+            localStorage.removeItem('activeCompanyId');
         }
     };
 
     const setActivePeriod = (period: string) => {
         setActivePeriodState(period);
         localStorage.setItem('activePeriod', period);
+    };
+
+    const sendPasswordResetEmail = async (email: string) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/update-password' });
+        if (error) throw error;
     };
 
     // --- CRUD Operations ---
@@ -434,22 +511,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         addNotification({ type: 'success', message: `Período ${period} reabierto exitosamente.` });
     };
     
-    const logout = async () => {
-        await supabase.auth.signOut();
-        // Clear all state
-        setCurrentUser(null);
-        setCompanies([]);
-        // ... reset all other states
-        setActiveCompanyIdState(null);
-        localStorage.clear();
-    };
-
-    const sendPasswordResetEmail = async (email: string) => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/update-password' });
-        if (error) throw error;
-    };
-
-
     return (
         <SessionContext.Provider value={{
             currentUser, companies, chartOfAccounts, subjects, costCenters, items, employees,

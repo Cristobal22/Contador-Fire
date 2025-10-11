@@ -45,6 +45,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
             nationality: 'Chileno',
             gender: 'Masculino',
             address: '',
+            region: '',
             commune: '',
             phone: '',
             email: '',
@@ -69,6 +70,9 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
             apv2_payment_method: 'PLANILLA',
             apvc_payment_method: 'PLANILLA',
             tax_type: 'AFECTO',
+            contract_address: '',
+            contract_region: '',
+            contract_commune: '',
         };
         if (!data) return defaults;
         
@@ -80,7 +84,9 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
     };
     
     const [formData, setFormData] = useState<EmployeeData>(getInitialFormData(initialData));
-    const [communeOptions, setCommuneOptions] = useState<string[]>([]);
+    const [personalCommuneOptions, setPersonalCommuneOptions] = useState<string[]>([]);
+    const [contractCommuneOptions, setContractCommuneOptions] = useState<string[]>([]);
+
 
     useEffect(() => {
         setFormData(getInitialFormData(initialData));
@@ -89,11 +95,21 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
     useEffect(() => {
         if (formData.region) {
             const selectedRegion = regions.find(r => r.name === formData.region);
-            setCommuneOptions(selectedRegion ? selectedRegion.communes : []);
+            setPersonalCommuneOptions(selectedRegion ? selectedRegion.communes : []);
         } else {
-            setCommuneOptions([]);
+            setPersonalCommuneOptions([]);
         }
     }, [formData.region]);
+    
+    useEffect(() => {
+        if (formData.contract_region) {
+            const selectedRegion = regions.find(r => r.name === formData.contract_region);
+            setContractCommuneOptions(selectedRegion ? selectedRegion.communes : []);
+        } else {
+            setContractCommuneOptions([]);
+        }
+    }, [formData.contract_region]);
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -115,7 +131,17 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
              }
         }
         
-        setFormData(prev => ({ ...prev, [name]: processedValue }));
+        setFormData(prev => {
+            const newFormData = { ...prev, [name]: processedValue };
+            // Reset commune when region changes
+            if (name === 'region') {
+                newFormData.commune = '';
+            }
+            if (name === 'contract_region') {
+                newFormData.contract_commune = '';
+            }
+            return newFormData;
+        });
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -142,7 +168,20 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         <div className="form-group"><label>Apellido Paterno</label><input name="paternal_lastname" value={formData.paternal_lastname || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Apellido Materno</label><input name="maternal_lastname" value={formData.maternal_lastname || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Dirección</label><input name="address" value={formData.address || ''} onChange={handleChange} /></div>
-                        <div className="form-group"><label>Comuna</label><input name="commune" value={formData.commune || ''} onChange={handleChange} /></div>
+                        <div className="form-group">
+                            <label>Región</label>
+                            <select name="region" value={formData.region || ''} onChange={handleChange}>
+                                <option value="">Seleccione una región</option>
+                                {regions.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Comuna</label>
+                            <select name="commune" value={formData.commune || ''} onChange={handleChange} disabled={!formData.region}>
+                                <option value="">Seleccione una comuna</option>
+                                {personalCommuneOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
                         <div className="form-group"><label>Teléfono</label><input name="phone" value={formData.phone || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Fecha de Nacimiento</label><input type="date" name="birth_date" value={formData.birth_date || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Nacionalidad</label><select name="nationality" value={formData.nationality || 'Chileno'} onChange={handleChange}><option>Chileno</option><option>Extranjero</option></select></div>
@@ -286,18 +325,19 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                                 {workdayTypes.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
                             </select>
                         </div>
+                        <div className="form-group"><label>Dirección del Contrato</label><input name="contract_address" value={formData.contract_address || ''} onChange={handleChange} /></div>
                         <div className="form-group">
-                            <label>Región</label>
-                            <select name="region" value={formData.region || ''} onChange={handleChange}>
+                            <label>Región del Contrato</label>
+                            <select name="contract_region" value={formData.contract_region || ''} onChange={handleChange}>
                                 <option value="">Seleccione una región</option>
                                 {regions.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Comuna</label>
-                            <select name="contract_commune" value={formData.contract_commune || ''} onChange={handleChange} disabled={!formData.region}>
+                            <label>Comuna del Contrato</label>
+                            <select name="contract_commune" value={formData.contract_commune || ''} onChange={handleChange} disabled={!formData.contract_region}>
                                 <option value="">Seleccione una comuna</option>
-                                {communeOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                {contractCommuneOptions.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                         <div className="form-group"><label>Sucursal (Caja)</label><input name="compensation_fund_branch" value={formData.compensation_fund_branch || ''} onChange={handleChange} /></div>
@@ -310,7 +350,6 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSave, onCancel, in
                         </div>
                         <div className="form-group"><label>Período Desde</label><input type="date" name="fixed_term_period_from" value={formData.fixed_term_period_from || ''} onChange={handleChange} /></div>
                         <div className="form-group"><label>Período Hasta</label><input type="date" name="fixed_term_period_to" value={formData.fixed_term_period_to || ''} onChange={handleChange} /></div>
-                        <div className="form-group grid-col-span-3-align-right"><button type="button" className="btn btn-secondary">Copiar región a todos los trabajadores</button></div>
                     </div>
                 </FormSection>
 
