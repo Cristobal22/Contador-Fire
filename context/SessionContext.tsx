@@ -70,18 +70,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const getOrCreateUserProfile = async (user: any): Promise<User | null> => {
-        const { data: profiles, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id);
+            .eq('id', user.id)
+            .single();
 
-        if (profileError) {
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows found
             handleApiError(profileError, 'al buscar perfil de usuario');
             return null;
         }
 
-        if (profiles && profiles.length > 0) {
-            return profiles[0];
+        if (profile) {
+            return profile;
         }
 
         const role = user.email === 'cvillalobosn22@gmail.com' ? 'administrador' : 'contador';
@@ -178,7 +179,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const fetchCompanies = async (userId: string) => {
-        const { data, error } = await supabase.from('companies').select('*').eq('user_id', userId);
+        const { data, error } = await supabase.from('companies').select('*').eq('owner_id', userId);
         if (error) {
             handleApiError(error, 'al cargar empresas');
             return [];
@@ -270,7 +271,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const addCompany = async (companyData: CompanyData) => {
         if (!currentUser) throw new Error("Usuario no autenticado.");
-        const { data, error } = await supabase.from('companies').insert([{ ...companyData, user_id: currentUser.id }]).select();
+        const { data, error } = await supabase.from('companies').insert([{ ...companyData, owner_id: currentUser.id }]).select();
         if (error) throw error;
         if(data) {
             setCompanies(prev => [...prev, ...data]);
