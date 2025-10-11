@@ -4,6 +4,44 @@ import { supabase } from '../supabaseClient';
 import type { Session, User, Company, Account, Voucher, Employee, Institution, MonthlyParameter, Payslip, Period, Notification, CostCenter } from '../types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
+// Define a default, empty session structure
+const defaultSession: Session = {
+    user: null!,
+    company: null,
+    periods: [],
+    accounts: [],
+    vouchers: [],
+    employees: [],
+    institutions: [],
+    monthlyParameters: [],
+    payslips: [],
+    costCenters: [],
+    activePeriod: '',
+    setActivePeriod: () => {},
+    addAccount: async () => { console.warn('addAccount called on empty session'); },
+    updateAccount: async () => { console.warn('updateAccount called on empty session'); },
+    deleteAccount: async () => { console.warn('deleteAccount called on empty session'); },
+    addVoucher: async () => { console.warn('addVoucher called on empty session'); },
+    updateVoucher: async () => { console.warn('updateVoucher called on empty session'); },
+    deleteVoucher: async () => { console.warn('deleteVoucher called on empty session'); },
+    addEmployee: async () => { console.warn('addEmployee called on empty session'); },
+    updateEmployee: async () => { console.warn('updateEmployee called on empty session'); },
+    deleteEmployee: async () => { console.warn('deleteEmployee called on empty session'); },
+    addInstitution: async () => { console.warn('addInstitution called on empty session'); },
+    updateInstitution: async () => { console.warn('updateInstitution called on empty session'); },
+    deleteInstitution: async () => { console.warn('deleteInstitution called on empty session'); },
+    addMonthlyParameter: async () => { console.warn('addMonthlyParameter called on empty session'); },
+    updateMonthlyParameter: async () => { console.warn('updateMonthlyParameter called on empty session'); },
+    deleteMonthlyParameter: async () => { console.warn('deleteMonthlyParameter called on empty session'); },
+    addPayslip: async () => { console.warn('addPayslip called on empty session'); },
+    updatePayslip: async () => { console.warn('updatePayslip called on empty session'); },
+    deletePayslip: async () => { console.warn('deletePayslip called on empty session'); },
+    addCostCenter: async () => { console.warn('addCostCenter called on empty session'); },
+    updateCostCenter: async () => { console.warn('updateCostCenter called on empty session'); },
+    deleteCostCenter: async () => { console.warn('deleteCostCenter called on empty session'); },
+};
+
+
 interface SessionContextValue {
     session: Session | null;
     loading: boolean;
@@ -55,27 +93,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const companyId = user.company_id;
 
             if (!companyId || user.role?.includes('Admin')) {
-                setSession({
-                    user,
-                    company: null, periods: [], accounts: [], vouchers: [], employees: [], institutions: [], monthlyParameters: [], payslips: [], costCenters: [],
-                    activePeriod: '', setActivePeriod: () => {},
-                    addAccount: async () => {}, updateAccount: async () => {}, deleteAccount: async () => {},
-                    addVoucher: async () => {}, updateVoucher: async () => {}, deleteVoucher: async () => {},
-                    addEmployee: async () => {}, updateEmployee: async () => {}, deleteEmployee: async () => {},
-                    addInstitution: async () => {}, updateInstitution: async () => {}, deleteInstitution: async () => {},
-                    addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
-                    addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
-                    addCostCenter: async () => {}, updateCostCenter: async () => {}, deleteCostCenter: async () => {},
-                });
+                setSession({ ...defaultSession, user });
                 return;
             }
 
-            const { data: companyData, error: companyError } = await supabase
-                .from('companies')
-                .select('*')
-                .eq('id', companyId)
-                .single();
-
+            const { data: companyData, error: companyError } = await supabase.from('companies').select('*').eq('id', companyId).single();
             if (companyError) throw companyError;
             if (!companyData) throw new Error(`Empresa con ID ${companyId} no encontrada.`);
             
@@ -92,11 +114,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             const results = await Promise.all(Object.entries(dataSources).map(async ([key, query]) => {
                 const { data, error } = await query;
-                if (error) {
-                    handleApiError(error, `cargando ${key}`);
-                    return [key, []];
-                }
-                return [key, data];
+                if (error) handleApiError(error, `cargando ${key}`);
+                return [key, data || []];
             }));
             
             const loadedData = Object.fromEntries(results);
@@ -110,14 +129,14 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setSession({
                 user,
                 company: companyData as Company,
-                periods: loadedData.periods || [],
-                accounts: loadedData.accounts || [],
-                vouchers: loadedData.vouchers || [],
-                employees: loadedData.employees || [],
-                institutions: loadedData.institutions || [],
-                monthlyParameters: loadedData.monthlyParameters || [],
-                payslips: loadedData.payslips || [],
-                costCenters: loadedData.cost_centers || [],
+                periods: loadedData.periods as Period[],
+                accounts: loadedData.accounts as Account[],
+                vouchers: loadedData.vouchers as Voucher[],
+                employees: loadedData.employees as Employee[],
+                institutions: loadedData.institutions as Institution[],
+                monthlyParameters: loadedData.monthlyParameters as MonthlyParameter[],
+                payslips: loadedData.payslips as Payslip[],
+                costCenters: loadedData.cost_centers as CostCenter[],
                 activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
                 setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
                 addAccount: createCrud<Account>('accounts').add, updateAccount: createCrud<Account>('accounts').update, deleteAccount: createCrud<Account>('accounts').delete,
@@ -156,12 +175,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     useEffect(() => {
         setLoading(true);
-
         supabase.auth.getSession().then(({ data: { session: supabaseSession } }) => {
             if (supabaseSession?.user) {
                 loadAllData(supabaseSession.user);
             } else {
                 setLoading(false);
+                setSession(null); // Explicitly set session to null when no user
             }
         });
 
