@@ -70,21 +70,21 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const getOrCreateUserProfile = async (user: any): Promise<User | null> => {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
-            .single();
+            .eq('id', user.id);
 
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows found
+        if (profileError) {
             handleApiError(profileError, 'al buscar perfil de usuario');
             return null;
         }
 
-        if (profile) {
-            return profile;
+        if (profiles && profiles.length > 0) {
+            return profiles[0]; // Return the first profile found
         }
 
+        // If no profile, create one
         const role = user.email === 'cvillalobosn22@gmail.com' ? 'administrador' : 'contador';
         
         const { data: newProfile, error: createError } = await supabase
