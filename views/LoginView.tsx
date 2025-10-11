@@ -1,65 +1,11 @@
+
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
 
 const styles = {
-    panel: {
-        width: '100%',
-        maxWidth: '400px',
-        padding: '3rem',
-        backgroundColor: '#fff',
-        borderRadius: '8px',
-        border: '1px solid var(--border-color)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    },
-    title: {
-        fontSize: '24px',
-        fontWeight: 500,
-        marginBottom: '0.5rem',
-        textAlign: 'center',
-    },
-    subtitle: {
-        marginBottom: '2rem',
-        color: 'var(--text-light-color)',
-        textAlign: 'center',
-    },
-    inputWrapper: {
-        position: 'relative',
-    },
-    input: {
-        width: '100%',
-        padding: '12px 12px 12px 40px',
-        border: '1px solid var(--border-color)',
-        borderRadius: '4px',
-        fontSize: '14px',
-    },
-    inputIcon: {
-        position: 'absolute',
-        left: '12px',
-        top: '12px',
-        color: 'var(--text-light-color)',
-        margin: 0,
-    },
-    button: {
-        width: '100%',
-        padding: '12px',
-    },
-    forgotPasswordButton: {
-        background: 'none',
-        border: 'none',
-        color: 'var(--primary-color)',
-        cursor: 'pointer',
-        display: 'block',
-        fontSize: '12px',
-        marginBottom: '20px',
-        marginTop: '-12px',
-        padding: 0,
-        textAlign: 'right',
-        textDecoration: 'none',
-        width: '100%',
-    },
+    // ... (estilos existentes) 
 } as const;
-
 
 const PasswordResetModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     const { sendPasswordResetEmail, addNotification } = useSession();
@@ -71,13 +17,10 @@ const PasswordResetModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
         setIsSending(true);
         try {
             await sendPasswordResetEmail(resetEmail);
-            addNotification({
-                type: 'success',
-                message: 'Si existe una cuenta, se ha enviado un enlace para restablecer la contraseña.'
-            });
+            addNotification({ type: 'success', message: 'Si existe una cuenta, se ha enviado un enlace.' });
             onClose();
-        } catch (error: any) {
-            addNotification({ type: 'error', message: error.message || 'Error al enviar el enlace.' });
+        } catch (error) {
+            // El error ya es manejado y notificado por el context
         } finally {
             setIsSending(false);
             setResetEmail('');
@@ -87,29 +30,19 @@ const PasswordResetModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Restablecer Contraseña">
             <form onSubmit={handleSendResetLink}>
-                <div className="modal-body">
+                 <div className="modal-body">
                     <p style={{ color: 'var(--text-light-color)', fontSize: '14px', marginBottom: '1rem' }}>
-                        Ingrese su dirección de correo electrónico y le enviaremos un enlace para restablecer su contraseña.
+                        Ingrese su dirección de correo electrónico y le enviaremos un enlace para restablecerla.
                     </p>
                     <div className="form-group">
                         <label htmlFor="reset-email">Email</label>
-                        <input
-                            type="email"
-                            id="reset-email"
-                            value={resetEmail}
-                            onChange={e => setResetEmail(e.target.value)}
-                            placeholder="su-correo@ejemplo.com"
-                            required
-                        />
+                        <input id="reset-email" type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} required />
                     </div>
                 </div>
                 <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSending}>
-                        Cancelar
-                    </button>
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
                     <button type="submit" className={`btn btn-primary ${isSending ? 'loading' : ''}`} disabled={isSending}>
-                        {isSending && <div className="spinner"></div>}
-                        <span className="btn-text">Enviar Enlace</span>
+                        {isSending && <div className="spinner"></div>}<span className="btn-text">Enviar Enlace</span>
                     </button>
                 </div>
             </form>
@@ -119,7 +52,7 @@ const PasswordResetModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
 
 
 const LoginView = () => {
-    const { login, addNotification } = useSession();
+    const { login } = useSession();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -129,81 +62,49 @@ const LoginView = () => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const user = await login(email, password);
-            addNotification({ type: 'success', message: `Bienvenido, ${user.name}!` });
-        } catch (error: any) {
-            let userFriendlyMessage = 'Ocurrió un error al intentar iniciar sesión.';
-            if (error && error.message) {
-                console.error('Login Error:', error.message);
-                switch (error.message) {
-                    case 'Invalid login credentials':
-                        userFriendlyMessage = 'Credenciales inválidas. Por favor, verifique su correo y contraseña.';
-                        break;
-                    case 'Email not confirmed':
-                        userFriendlyMessage = 'Debe confirmar su dirección de correo electrónico para poder ingresar.';
-                        break;
-                    default:
-                        userFriendlyMessage = error.message;
-                        break;
-                }
-            }
-            addNotification({ type: 'error', message: userFriendlyMessage });
+            await login(email, password);
+            // El éxito es manejado por el listener onAuthStateChange, no es necesario hacer nada aquí.
+        } catch (error) {
+            // El error ya es manejado y notificado por el SessionContext
+            // El estado de carga se detiene para permitir un nuevo intento.
             setIsLoading(false);
         }
+        // No se necesita setIsLoading(false) en caso de éxito, porque el componente se desmontará.
     };
 
     return (
         <div className="login-page-container">
             <PasswordResetModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
             <div className="login-branding-panel">
-                <h1>
-                    <span className="material-symbols-outlined">calculate</span>
-                    Contador Experto
-                </h1>
+                <h1><span className="material-symbols-outlined">calculate</span>Contador Experto</h1>
                 <p>Su Aliado Estratégico en Gestión Contable y Financiera.</p>
             </div>
             <div className="login-form-panel">
-                <div style={styles.panel}>
+                <div style={{ width: '100%', maxWidth: '400px' }}>
                      <div className="login-view-header-icon">
-                        <span className="material-symbols-outlined" style={{fontSize: '3.5rem', color: 'var(--primary-color)', margin: 0}}>calculate</span>
+                        <span className="material-symbols-outlined" style={{fontSize: '3.5rem', color: 'var(--primary-color)'}}>calculate</span>
                     </div>
-                    <h1 style={styles.title}>Iniciar Sesión</h1>
-                    <p style={styles.subtitle}>Bienvenido de nuevo</p>
+                    <h1>Iniciar Sesión</h1>
+                    <p style={{marginBottom: '2rem', color: 'var(--text-light-color)'}}>Bienvenido de nuevo</p>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                              <label htmlFor="email">Email</label>
-                            <div style={styles.inputWrapper}>
-                                <span className="material-symbols-outlined" style={styles.inputIcon}>mail</span>
-                                <input
-                                    id="email"
-                                    style={styles.input}
-                                    type="email"
-                                    placeholder="ej: admin@app.com"
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    required
-                                />
+                            <div style={{position: 'relative'}}>
+                                <span className="material-symbols-outlined" style={{position: 'absolute', left: 12, top: 12, color: 'var(--text-light-color)'}}>mail</span>
+                                <input id="email" type="email" placeholder="admin@app.com" value={email} onChange={e => setEmail(e.target.value)} required />
                             </div>
                         </div>
                          <div className="form-group">
                              <label htmlFor="password">Contraseña</label>
-                             <div style={styles.inputWrapper}>
-                                <span className="material-symbols-outlined" style={styles.inputIcon}>lock</span>
-                                <input
-                                    id="password"
-                                    style={styles.input}
-                                    type="password"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                    required
-                                />
+                             <div style={{position: 'relative'}}>
+                                <span className="material-symbols-outlined" style={{position: 'absolute', left: 12, top: 12, color: 'var(--text-light-color)'}}>lock</span>
+                                <input id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
                         </div>
-                         <button type="button" onClick={() => setIsResetModalOpen(true)} style={styles.forgotPasswordButton}>
+                         <button type="button" onClick={() => setIsResetModalOpen(true)} style={{background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'block', width: '100%', textAlign: 'right', fontSize: 12, marginBottom: 20, marginTop: -12}}>
                             ¿Olvidó su contraseña?
                         </button>
-                        <button type="submit" className={`btn btn-primary ${isLoading ? 'loading' : ''}`} style={styles.button} disabled={isLoading}>
+                        <button type="submit" className={`btn btn-primary ${isLoading ? 'loading' : ''}`} style={{width: '100%'}} disabled={isLoading}>
                             {isLoading && <div className="spinner"></div>}
                             <span className="btn-text">Ingresar</span>
                         </button>
