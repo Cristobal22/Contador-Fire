@@ -3,23 +3,33 @@ import React from 'react';
 import { useSession } from '../context/SessionContext';
 import { CrudView } from '../components/CrudView';
 import type { MonthlyParameter } from '../types';
-import { MONTHLY_PARAMETERS } from '../utils/payroll'; // Importa la nueva lista
+import { MONTHLY_PARAMETERS } from '../utils/payroll';
 
 const MonthlyParametersView = () => {
     const session = useSession();
 
-    const periodOptions = session.periods ? session.periods.map(p => ({ value: p.value, label: p.label })) : [];
+    // -- SOLUCIÓN --
+    // Si la sesión o los datos esenciales aún no están cargados, muestra un estado de carga.
+    // Esto previene que el componente intente renderizar con datos `undefined`.
+    if (!session || !session.monthlyParameters || !session.periods) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <p>Cargando parámetros...</p>
+            </div>
+        );
+    }
 
-    // Define los campos del formulario usando la nueva lista de parámetros
+    const periodOptions = session.periods.map(p => ({ value: p.value, label: p.label }));
+
     const formFields = [
         { name: 'period', label: 'Período', type: 'select', options: periodOptions },
-        { 
-            name: 'name', 
-            label: 'Nombre del Parámetro', 
-            type: 'select', 
-            options: MONTHLY_PARAMETERS, // Usa la lista importada
-            displayKey: 'label', // Le dice al GenericForm qué mostrar
-            valueKey: 'value' // Le dice al GenericForm qué valor usar
+        {
+            name: 'name',
+            label: 'Nombre del Parámetro',
+            type: 'select',
+            options: MONTHLY_PARAMETERS,
+            displayKey: 'label',
+            valueKey: 'value'
         },
         { name: 'value', label: 'Valor', type: 'number' }
     ];
@@ -32,11 +42,11 @@ const MonthlyParametersView = () => {
                 { key: 'name', header: 'Nombre' },
                 { key: 'value', header: 'Valor' }
             ]}
-            data={session.monthlyParameters || []}
+            data={session.monthlyParameters} // Ya no es necesario el `|| []` por el chequeo de carga.
             onSave={session.addMonthlyParameter}
             onUpdate={session.updateMonthlyParameter}
             onDelete={session.deleteMonthlyParameter}
-            formFields={formFields} // Pasa los campos definidos
+            formFields={formFields}
         />
     );
 };
