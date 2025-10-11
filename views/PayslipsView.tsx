@@ -1,10 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
 import Modal from '../components/Modal';
 import type { Payslip, PayslipData, Employee } from '../types';
-import { generatePayslipForEmployee } from '../utils/payrollEngine'; // Importamos desde el motor de cálculo
+import { generatePayslipForEmployee } from '../utils/payrollEngine';
 
 // Componente para el formulario de edición
 const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void, onCancel: () => void, isLoading: boolean }> = ({ payslip, onSave, onCancel, isLoading }) => {
@@ -34,30 +34,47 @@ const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void,
 
 const PayslipsView = () => {
     const { addNotification, handleApiError, ...session } = useSession();
-    // Extraemos todos los datos necesarios de la sesión
-    const { employees, institutions, payslips, monthlyParameters, addPayslip, deletePayslip, updatePayslip, activePeriod, setActivePeriod } = session;
+    
+    // SOLUCIÓN: Proveer arrays vacíos como valor por defecto para evitar el error 'filter of undefined'
+    const {
+        employees = [],
+        institutions = [],
+        payslips = [],
+        monthlyParameters = [],
+        addPayslip,
+        deletePayslip,
+        updatePayslip,
+        activePeriod,
+        setActivePeriod
+    } = session;
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const currentYear = new Date(activePeriod + '-02').getFullYear();
-    const currentMonth = new Date(activePeriod + '-02').getMonth() + 1;
+    // El resto del componente puede fallar si activePeriod es null al inicio
+    // Lo protegemos estableciendo un valor predeterminado si no existe.
+    const safeActivePeriod = activePeriod || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+    const currentYear = new Date(safeActivePeriod + '-02').getFullYear();
+    const currentMonth = new Date(safeActivePeriod + '-02').getMonth() + 1;
 
     const handlePeriodChange = (year: number, month: number) => {
         const newPeriod = `${year}-${String(month).padStart(2, '0')}`;
-        setActivePeriod(newPeriod);
+        if (setActivePeriod) setActivePeriod(newPeriod);
     };
 
     const handleGeneratePayslips = async () => {
+        if (!addPayslip || !setActivePeriod) return; // Guard against session functions not being ready
+
         setIsLoading(true);
         addNotification({ type: 'info', message: 'Iniciando generación de liquidaciones...' });
 
-        const employeesWithPayslip = new Set(payslips.filter(p => p.period === activePeriod).map(p => p.employeeId));
+        const employeesWithPayslip = new Set(payslips.filter(p => p.period === safeActivePeriod).map(p => p.employeeId));
         const employeesToProcess = employees.filter(e => !employeesWithPayslip.has(e.id));
 
         if (employeesToProcess.length === 0) {
-            addNotification({ type: 'warning', message: 'Todos los empleados ya tienen una liquidación para este período.' });
+            addNotification({ type: 'warning', message: 'No hay empleados para procesar o ya tienen una liquidación para este período.' });
             setIsLoading(false);
             return;
         }
@@ -67,8 +84,7 @@ const PayslipsView = () => {
 
         for (const employee of employeesToProcess) {
             try {
-                // ¡AHORA PASAMOS LOS PARÁMETROS MENSUALES REALES!
-                const result = generatePayslipForEmployee(employee, institutions, activePeriod, monthlyParameters);
+                const result = generatePayslipForEmployee(employee, institutions, safeActivePeriod, monthlyParameters);
                 
                 const payslipData: PayslipData = {
                     period: result.period,
@@ -94,7 +110,6 @@ const PayslipsView = () => {
                 successCount++;
             } catch (error: any) {
                 errorCount++;
-                // Usamos handleApiError para unificar el manejo de errores y mostrarlo
                 handleApiError(error, `al generar liquidación para ${employee.name}`);
             }
         }
@@ -103,13 +118,13 @@ const PayslipsView = () => {
         setIsLoading(false);
     };
 
-    // --- Funciones para el modal de edición ---
     const handleEdit = (payslip: Payslip) => {
         setEditingPayslip(payslip);
         setIsEditModalOpen(true);
     };
     
     const handleSave = async (updatedPayslip: any) => {
+        if (!updatePayslip) return;
         setIsLoading(true);
         try {
             await updatePayslip(updatedPayslip);
@@ -123,6 +138,7 @@ const PayslipsView = () => {
     };
 
     const handleDeleteConfirm = async (id: number) => {
+        if (!deletePayslip) return;
         if (window.confirm('¿Está seguro de que desea eliminar esta liquidación?')) {
             try {
                 await deletePayslip(id);
@@ -133,8 +149,8 @@ const PayslipsView = () => {
         }
     };
 
-    // --- Renderizado ---
     const formatCurrency = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
+    const filteredPayslips = payslips.filter(p => p.period === safeActivePeriod);
 
     return (
         <SimpleReportView title="Gestión de Liquidaciones de Sueldo">
@@ -151,7 +167,7 @@ const PayslipsView = () => {
                         )}
                     </select>
                 </div>
-                <button className={`btn btn-primary ${isLoading ? 'loading' : ''}`} onClick={handleGeneratePayslips} disabled={isLoading}>
+                <button className={`btn btn-primary ${isLoading ? 'loading' : ''}`} onClick={handleGeneratePayslips} disabled={isLoading || !employees.length}>
                      {isLoading && <div className="spinner"></div>}
                     <span className="material-symbols-outlined">play_arrow</span>
                     <span className="btn-text">Generar Liquidaciones para el Período</span>
@@ -169,7 +185,7 @@ const PayslipsView = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {payslips.filter(p => p.period === activePeriod).length > 0 ? payslips.filter(p => p.period === activePeriod).map(p => {
+                    {filteredPayslips.length > 0 ? filteredPayslips.map(p => {
                         const employee = employees.find(e => e.id === p.employeeId);
                         const totalDeductions = p.deductions.reduce((sum: number, d) => sum + d.amount, 0) + p.incomeTax;
                         return (
