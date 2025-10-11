@@ -89,7 +89,7 @@ const Header = ({ onSearchClick }: { onSearchClick: () => void }) => {
     if (!session) return null;
 
     const { user, company, periods, activePeriod, setActivePeriod } = session;
-    const isSystemAdmin = user.role === 'System Administrator';
+    const isSystemAdmin = user.role?.includes('Admin');
 
     return (
         <header className="app-header">
@@ -132,7 +132,7 @@ const AppLayout = () => {
     
     if (!session) return <Navigate to="/login" />;
 
-    const isSystemAdmin = session.user.role === 'System Administrator';
+    const isSystemAdmin = session.user.role?.includes('Admin');
     const currentNavStructure = isSystemAdmin ? adminNavStructure : navStructure;
 
     const breadcrumb = getPathBreadcrumb(location.pathname, currentNavStructure) || (isSystemAdmin ? 'Admin Dashboard' : 'Dashboard');
@@ -171,7 +171,7 @@ const AuthWrapper = () => {
             <Route path="/login" element={!session ? <LoginView /> : <Navigate to="/" />} />
             <Route path="/update-password" element={<UpdatePasswordView />} />
             <Route path="/" element={session ? <AppLayout /> : <Navigate to="/login" />}>
-                 <Route index element={<Navigate to={session?.user?.role === 'System Administrator' ? '/admin/users' : '/dashboard'} replace />} />
+                 <Route index element={<Navigate to={session?.user?.role?.includes('Admin') ? '/admin/users' : '/dashboard'} replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
                 
                 {/* Rutas de la aplicación principal */}
