@@ -290,4 +290,14 @@ export const CompanySettingsView: React.FC = () => {
                     <AccountGroup title="Flujo Efectivo" isOpen={openAccordion === 'Flujo Efectivo'} onToggle={() => handleAccordionToggle('Flujo Efectivo')}>
                         {renderAccountInput('Equivalente Efectivos', 'cash_equivalent_account')}
                         {renderAccountInput('Cuenta Retiro Socio', 'partner_withdrawal_account')}
-                    </A
+                    </AccountGroup>
+                </div>
+            </div>
+            <AccountSearchModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                onSelectAccount={handleSelectAccount} 
+            />
+        </div>
+    );
+};
