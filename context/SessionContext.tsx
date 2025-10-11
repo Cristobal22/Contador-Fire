@@ -107,15 +107,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             }
 
             if (session?.user) {
-                const { data: userProfile, error: profileError } = await supabase
+                const { data: userProfiles, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('id', session.user.id)
-                    .single();
+                    .eq('id', session.user.id);
                 
                 if (profileError) {
                      handleApiError(profileError, "al obtener el perfil de usuario");
-                } else {
+                } else if (userProfiles && userProfiles.length > 0) {
+                    const userProfile = userProfiles[0];
                     setCurrentUser(userProfile);
                     const ownedCompanies = await fetchCompanies(userProfile.id);
                      const storedCompanyId = localStorage.getItem('activeCompanyId');
@@ -124,6 +124,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                     } else if (ownedCompanies.length > 0) {
                         setActiveCompanyId(ownedCompanies[0].id);
                     }
+                } else {
+                    handleApiError({ message: 'Perfil de usuario no encontrado' }, 'checkSession');
                 }
             } else {
                  setCurrentUser(null);
@@ -143,12 +145,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 setActiveCompanyId(null);
                 localStorage.removeItem('activeCompanyId');
             } else if (event === 'SIGNED_IN' && session?.user) {
-                 const { data: userProfile, error: profileError } = await supabase
+                 const { data: userProfiles, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-                if (userProfile) setCurrentUser(userProfile)
+                    .eq('id', session.user.id);
+                if (profileError) {
+                    handleApiError(profileError, "onAuthStateChange");
+                } else if (userProfiles && userProfiles.length > 0) {
+                    setCurrentUser(userProfiles[0]);
+                }
             }
         });
 
@@ -170,14 +175,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (error) throw error;
         if (!data.user) throw new Error("Inicio de sesión fallido, no se encontró el usuario.");
 
-        const { data: userProfile, error: profileError } = await supabase
+        const { data: userProfiles, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', data.user.id)
-            .single();
+            .eq('id', data.user.id);
 
         if (profileError) throw profileError;
-        if (!userProfile) throw new Error("No se encontró el perfil del usuario.");
+        if (!userProfiles || userProfiles.length === 0) throw new Error("No se encontró el perfil del usuario.");
+        const userProfile = userProfiles[0];
         
         setCurrentUser(userProfile);
         const ownedCompanies = await fetchCompanies(userProfile.id);
