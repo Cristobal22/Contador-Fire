@@ -68,6 +68,38 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         console.error(`Error context: ${context}`, error);
         addNotification({ type: 'error', message: error.message || `Error desconocido ${context}` });
     };
+
+    const getOrCreateUserProfile = async (user: any): Promise<User | null> => {
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id);
+
+        if (profileError) {
+            handleApiError(profileError, 'al buscar perfil de usuario');
+            return null;
+        }
+
+        if (profiles && profiles.length > 0) {
+            return profiles[0];
+        }
+
+        const role = user.email === 'cvillalobosn22@gmail.com' ? 'administrador' : 'contador';
+        
+        const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({ id: user.id, role: role })
+            .select()
+            .single();
+
+        if (createError) {
+            handleApiError(createError, 'al crear perfil de usuario');
+            return null;
+        }
+        
+        addNotification({ type: 'success', message: '¡Perfil de usuario creado exitosamente!' });
+        return newProfile;
+    };
     
     const fetchDataForCompany = async (companyId: number) => {
         if (!companyId) return;
@@ -107,25 +139,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             }
 
             if (session?.user) {
-                const { data: userProfiles, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id);
+                const userProfile = await getOrCreateUserProfile(session.user);
                 
-                if (profileError) {
-                     handleApiError(profileError, "al obtener el perfil de usuario");
-                } else if (userProfiles && userProfiles.length > 0) {
-                    const userProfile = userProfiles[0];
+                if (userProfile) {
                     setCurrentUser(userProfile);
                     const ownedCompanies = await fetchCompanies(userProfile.id);
-                     const storedCompanyId = localStorage.getItem('activeCompanyId');
+                    const storedCompanyId = localStorage.getItem('activeCompanyId');
                     if (storedCompanyId && ownedCompanies.some(c => c.id === Number(storedCompanyId))) {
                         setActiveCompanyId(Number(storedCompanyId));
                     } else if (ownedCompanies.length > 0) {
                         setActiveCompanyId(ownedCompanies[0].id);
                     }
-                } else {
-                    handleApiError({ message: 'Perfil de usuario no encontrado' }, 'checkSession');
                 }
             } else {
                  setCurrentUser(null);
@@ -145,15 +169,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
                 setActiveCompanyId(null);
                 localStorage.removeItem('activeCompanyId');
             } else if (event === 'SIGNED_IN' && session?.user) {
-                 const { data: userProfiles, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id);
-                if (profileError) {
-                    handleApiError(profileError, "onAuthStateChange");
-                } else if (userProfiles && userProfiles.length > 0) {
-                    setCurrentUser(userProfiles[0]);
-                }
+                 const userProfile = await getOrCreateUserProfile(session.user);
+                 if (userProfile) setCurrentUser(userProfile);
             }
         });
 
@@ -161,7 +178,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const fetchCompanies = async (userId: string) => {
-        const { data, error } = await supabase.from('companies').select('*').eq('owner_id', userId);
+        const { data, error } = await supabase.from('companies').select('*').eq('user_id', userId);
         if (error) {
             handleApiError(error, 'al cargar empresas');
             return [];
@@ -175,14 +192,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         if (error) throw error;
         if (!data.user) throw new Error("Inicio de sesión fallido, no se encontró el usuario.");
 
-        const { data: userProfiles, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id);
+        const userProfile = await getOrCreateUserProfile(data.user);
 
-        if (profileError) throw profileError;
-        if (!userProfiles || userProfiles.length === 0) throw new Error("No se encontró el perfil del usuario.");
-        const userProfile = userProfiles[0];
+        if (!userProfile) throw new Error("No se encontró o no se pudo crear el perfil del usuario.");
         
         setCurrentUser(userProfile);
         const ownedCompanies = await fetchCompanies(userProfile.id);
@@ -258,7 +270,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const addCompany = async (companyData: CompanyData) => {
         if (!currentUser) throw new Error("Usuario no autenticado.");
-        const { data, error } = await supabase.from('companies').insert([{ ...companyData, owner_id: currentUser.id }]).select();
+        const { data, error } = await supabase.from('companies').insert([{ ...companyData, user_id: currentUser.id }]).select();
         if (error) throw error;
         if(data) {
             setCompanies(prev => [...prev, ...data]);
