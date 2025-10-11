@@ -120,10 +120,22 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const loadUser = useCallback(async (authUser: SupabaseUser) => {
         setLoading(true);
         try {
-            const { data: profileData, error: profileError } = await supabase.from('profiles').select('*, companies:user_companies(company:companies(*))').eq('id', authUser.id).single();
-            if (profileError) throw profileError;
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select(`
+                    *, 
+                    companies:user_companies!inner(company:companies!inner(*))
+                `)
+                .eq('id', authUser.id)
+                .single();
 
-            const user: User = { ...authUser, ...profileData, companies: profileData.companies.map((uc: any) => uc.company) };
+            if (profileError) throw profileError;
+            
+            const user: User = { 
+                ...authUser, 
+                ...profileData, 
+                companies: profileData.companies.map((c: any) => c.company) 
+            };
             setSession({ ...defaultSession, user } as Session);
 
         } catch (error) {
