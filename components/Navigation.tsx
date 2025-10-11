@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, ChangeEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { NavStructure, NavItemDefinition } from '../types';
@@ -17,7 +18,7 @@ const styles = {
         fontSize: '14px',
         cursor: 'pointer',
     },
-    sidebarNavList: { listStyle: 'none', padding: '10px 0', overflowY: 'auto', flexGrow: 1 } as React.CSSProperties,
+    sidebarNavList: { listStyle: 'none', padding: '10px 0', margin: 0, overflowY: 'auto', flexGrow: 1 } as React.CSSProperties,
     sidebarNavItem: (level: number, isActive: boolean): React.CSSProperties => ({
         display: 'flex',
         alignItems: 'center',
@@ -31,53 +32,62 @@ const styles = {
         transition: 'all 0.2s ease',
         fontSize: '14px'
     }),
-    navToggle: { marginLeft: 'auto' },
-    navButton: { width: '100%', border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', padding: 0 },
+    navItemIcon: { marginRight: '10px', display: 'flex', alignItems: 'center' } as React.CSSProperties,
+    navToggle: { marginLeft: 'auto' } as React.CSSProperties,
+    navButton: { width: '100%', border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', padding: 0 } as React.CSSProperties,
 } as const;
 
-// Hook para manejar el estado de apertura/cierre de los menús (sin cambios)
 const useMenuState = (navData: NavStructure) => {
-    const getInitialState = () => {
+    const getInitialState = useCallback(() => {
         const buildStateRecursively = (data: NavStructure, parentKey = ''): Record<string, boolean> => {
             return Object.entries(data).reduce((acc, [key, value]) => {
                 const currentKey = parentKey ? `${parentKey}>${key}` : key;
                 if ('children' in value && Object.keys(value.children).length > 0) {
-                    acc[currentKey] = parentKey === '';
+                    acc[currentKey] = parentKey === ''; // Expandir solo el primer nivel por defecto
                     Object.assign(acc, buildStateRecursively(value.children, currentKey));
                 }
                 return acc;
             }, {} as Record<string, boolean>);
         };
         return buildStateRecursively(navData);
-    };
-    const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(getInitialState);
+    }, [navData]);
+
+    const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(getInitialState());
+
+    useEffect(() => {
+        setOpenMenus(getInitialState());
+    }, [navData, getInitialState]);
+
     const toggleMenu = useCallback((key: string) => setOpenMenus(prev => ({ ...prev, [key]: !prev[key] })), []);
     return { openMenus, toggleMenu };
 };
 
-// Componente recursivo para renderizar el menú (sin cambios)
 const NavMenu: React.FC<any> = ({ data, openMenus, toggleMenu, level = 0, urlParentPath = '', menuKeyParentPath = '' }) => {
-    if (Array.isArray(data)) {
-        return <ul>{data.map(item => <li key={item}><NavLink to={`${urlParentPath}/${item.toLowerCase().replace(/\s+/g, '-')}`} style={({ isActive }) => styles.sidebarNavItem(level, isActive)}>{item}</NavLink></li>)}</ul>;
-    }
     return (
         <ul style={styles.sidebarNavList}>{
             Object.entries(data).map(([key, value]) => {
-                const navItem = value as any;
+                const navItem = value as NavItemDefinition;
                 const currentUrlPath = navItem.path || `${urlParentPath}/${key.toLowerCase().replace(/\s+/g, '-')}`;
                 const currentMenuKey = menuKeyParentPath ? `${menuKeyParentPath}>${key}` : key;
                 const hasChildren = 'children' in navItem && !!navItem.children && Object.keys(navItem.children).length > 0;
 
                 if (!hasChildren) {
-                    return <li key={currentUrlPath}><NavLink to={currentUrlPath} style={({ isActive }) => styles.sidebarNavItem(level, isActive)}>{navItem.icon && <span className="material-symbols-outlined">{navItem.icon}</span>}{key}</NavLink></li>;
+                    return (
+                        <li key={currentUrlPath}>
+                            <NavLink to={currentUrlPath} style={({ isActive }) => styles.sidebarNavItem(level, isActive)}>
+                                {navItem.icon && <span className="material-symbols-outlined" style={styles.navItemIcon}>{navItem.icon}</span>}
+                                {key}
+                            </NavLink>
+                        </li>
+                    );
                 }
 
                 const isOpen = openMenus[currentMenuKey] ?? false;
                 return (
-                    <li key={currentUrlPath}>
+                    <li key={currentMenuKey}>
                         <button style={styles.navButton} onClick={() => toggleMenu(currentMenuKey)}>
-                            <span style={styles.sidebarNavItem(level, false)}>
-                                {navItem.icon && <span className="material-symbols-outlined">{navItem.icon}</span>}
+                            <span style={{...styles.sidebarNavItem(level, false), display: 'flex', width: '100%'}}>
+                                {navItem.icon && <span className="material-symbols-outlined" style={styles.navItemIcon}>{navItem.icon}</span>}
                                 {key}
                                 <span style={styles.navToggle}><span className="material-symbols-outlined">{isOpen ? 'expand_less' : 'expand_more'}</span></span>
                             </span>
@@ -90,19 +100,20 @@ const NavMenu: React.FC<any> = ({ data, openMenus, toggleMenu, level = 0, urlPar
     );
 };
 
-// Componente principal de la barra lateral
 export const Sidebar = ({ navStructure }: { navStructure: NavStructure }) => {
-    const { currentUser, companies, activeCompany, setActiveCompanyId, addNotification } = useSession();
+    const { session, addNotification } = useSession();
     const { openMenus, toggleMenu } = useMenuState(navStructure);
 
-    if (!currentUser) return null;
+    if (!session?.user) return null;
+
+    // NOTA: La lógica de multi-empresa no está completamente implementada en el contexto.
+    // El siguiente código asume que el cambio de empresa se manejará en el futuro.
+    const activeCompany = session.company;
+    const companies = session.company ? [session.company] : []; // Placeholder
 
     const handleCompanyChange = (event: ChangeEvent<HTMLSelectElement>) => {
-        const newCompanyId = Number(event.target.value);
-        if (setActiveCompanyId) {
-            setActiveCompanyId(newCompanyId);
-            const selectedCompany = companies.find(c => c.id === newCompanyId);
-            addNotification({ type: 'success', message: `Empresa cambiada a: ${selectedCompany?.name}` });
+        if (addNotification) {
+            addNotification({ type: 'error', message: 'El cambio de empresa aún no está implementado.' });
         }
     };
 

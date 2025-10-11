@@ -64,57 +64,68 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
                     addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
                 });
-            } else {
-                const { data: companyData, error: companyError } = await supabase
-                    .from('companies')
-                    .select('*')
-                    .eq('id', companyId)
-                    .single();
-
-                if (companyError) throw companyError;
-                if (!companyData) throw new Error(`Empresa con ID ${companyId} no encontrada.`);
-
-                const [periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes] = await Promise.all([
-                    supabase.from('periods').select('*').eq('company_id', companyId),
-                    supabase.from('employees').select('*').eq('company_id', companyId),
-                    supabase.from('institutions').select('*').eq('company_id', companyId),
-                    supabase.from('monthly_parameters').select('*').eq('company_id', companyId),
-                    supabase.from('payslips').select('*').eq('company_id', companyId),
-                ]);
-                
-                for (const res of [periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes]) {
-                    if (res.error) throw res.error;
-                }
-
-                const createCrud = <T extends { id: any }>(table: string) => ({
-                    add: async (data: Omit<T, 'id' | 'company_id'>) => { await supabase.from(table).insert({ ...data, company_id: companyId }); },
-                    update: async (data: T) => { await supabase.from(table).update(data).eq('id', data.id); },
-                    delete: async (id: any) => { await supabase.from(table).delete().eq('id', id); },
-                });
-
-                setSession({
-                    user,
-                    company: companyData as Company,
-                    periods: periodsRes.data || [],
-                    employees: employeesRes.data || [],
-                    institutions: institutionsRes.data || [],
-                    monthlyParameters: monthlyParamsRes.data || [],
-                    payslips: payslipsRes.data || [],
-                    activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
-                    setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
-                    addEmployee: createCrud<Employee>('employees').add, updateEmployee: createCrud<Employee>('employees').update, deleteEmployee: createCrud<Employee>('employees').delete,
-                    addInstitution: createCrud<Institution>('institutions').add, updateInstitution: createCrud<Institution>('institutions').update, deleteInstitution: createCrud<Institution>('institutions').delete,
-                    addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add, updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update, deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,
-                    addPayslip: createCrud<Payslip>('payslips').add, updatePayslip: createCrud<Payslip>('payslips').update, deletePayslip: createCrud<Payslip>('payslips').delete,
-                });
+                setLoading(false); // Asegurarse de que loading sea false para admin/sin empresa
+                return;
             }
+
+            const { data: companyData, error: companyError } = await supabase
+                .from('companies')
+                .select('*')
+                .eq('id', companyId)
+                .single();
+
+            if (companyError) throw companyError;
+            if (!companyData) throw new Error(`Empresa con ID ${companyId} no encontrada.`);
+            
+            // Carga de datos secundarios en paralelo con manejo de errores individual
+            const dataSources = {
+                periods: supabase.from('periods').select('*').eq('company_id', companyId),
+                employees: supabase.from('employees').select('*').eq('company_id', companyId),
+                institutions: supabase.from('institutions').select('*').eq('company_id', companyId),
+                monthlyParameters: supabase.from('monthly_parameters').select('*').eq('company_id', companyId),
+                payslips: supabase.from('payslips').select('*').eq('company_id', companyId),
+            };
+
+            const results = await Promise.all(Object.entries(dataSources).map(async ([key, query]) => {
+                const { data, error } = await query;
+                if (error) {
+                    handleApiError(error, `cargando ${key}`);
+                    return [key, []]; // Devuelve un array vacío en caso de error
+                }
+                return [key, data];
+            }));
+            
+            const loadedData = Object.fromEntries(results);
+
+            const createCrud = <T extends { id: any }>(table: string) => ({
+                add: async (data: Omit<T, 'id' | 'company_id'>) => { await supabase.from(table).insert({ ...data, company_id: companyId }); },
+                update: async (data: T) => { await supabase.from(table).update(data).eq('id', data.id); },
+                delete: async (id: any) => { await supabase.from(table).delete().eq('id', id); },
+            });
+
+            setSession({
+                user,
+                company: companyData as Company,
+                periods: loadedData.periods || [],
+                employees: loadedData.employees || [],
+                institutions: loadedData.institutions || [],
+                monthlyParameters: loadedData.monthlyParameters || [],
+                payslips: loadedData.payslips || [],
+                activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+                setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
+                addEmployee: createCrud<Employee>('employees').add, updateEmployee: createCrud<Employee>('employees').update, deleteEmployee: createCrud<Employee>('employees').delete,
+                addInstitution: createCrud<Institution>('institutions').add, updateInstitution: createCrud<Institution>('institutions').update, deleteInstitution: createCrud<Institution>('institutions').delete,
+                addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add, updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update, deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,
+                addPayslip: createCrud<Payslip>('payslips').add, updatePayslip: createCrud<Payslip>('payslips').update, deletePayslip: createCrud<Payslip>('payslips').delete,
+            });
+
         } catch (error) {
             handleApiError(error, "cargando los datos de la sesión");
             await logout();
         } finally {
             setLoading(false);
         }
-    }, [handleApiError, logout]);
+    }, [handleApiError, logout, addNotification]);
     
     const login = useCallback(async (email: string, password: string) => {
         setLoading(true);
@@ -134,6 +145,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [handleApiError, addNotification]);
 
     useEffect(() => {
+        setLoading(true); // Empieza en loading en el primer render
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
             if (event === 'SIGNED_IN' && supabaseSession?.user) {
                 await loadAllData(supabaseSession.user);
@@ -147,8 +159,23 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 } else {
                     setLoading(false);
                 }
+            } else if (event === 'USER_UPDATED') {
+                if (supabaseSession?.user) {
+                    await loadAllData(supabaseSession.user);
+                }
             }
         });
+
+        const initialLoad = async () => {
+            const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+            if (supabaseSession?.user) {
+                await loadAllData(supabaseSession.user);
+            } else {
+                setLoading(false);
+            }
+        };
+
+        initialLoad();
 
         return () => { authListener.subscription.unsubscribe(); };
     }, [loadAllData, addNotification]);
