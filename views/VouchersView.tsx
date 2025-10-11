@@ -66,7 +66,7 @@ const VouchersView: React.FC = () => {
     const columns = [
         { id: 'date', header: 'Fecha', accessor: (v: Voucher) => v.date },
         { id: 'description', header: 'Glosa', accessor: (v: Voucher) => v.description },
-        { id: 'entries', header: 'N° Asientos', accessor: (v: Voucher) => v.entries.length },
+        { id: 'entries', header: 'N° Asientos', accessor: (v: Voucher) => (v.entries || []).length },
     ];
 
     return (
@@ -110,8 +110,8 @@ const VouchersView: React.FC = () => {
 };
 
 const VoucherDetailModal: React.FC<{ voucher: Voucher, onClose: () => void, accounts: Account[] }> = ({ voucher, onClose, accounts }) => {
-    const getAccountName = (id: number | '') => accounts.find(a => a.id === id)?.name || 'N/A';
-    const totalDebit = voucher.entries.reduce((sum, e) => sum + e.debit, 0);
+    const getAccountName = (id: number | '') => (accounts || []).find(a => a.id === id)?.name || 'N/A';
+    const totalDebit = (voucher.entries || []).reduce((sum, e) => sum + e.debit, 0);
 
     return (
         <Modal isOpen={true} onClose={onClose} title="Detalle Comprobante Contable" size="lg">
@@ -130,7 +130,7 @@ const VoucherDetailModal: React.FC<{ voucher: Voucher, onClose: () => void, acco
                         </tr>
                     </thead>
                     <tbody>
-                        {voucher.entries.map(entry => (
+                        {(voucher.entries || []).map(entry => (
                             <tr key={entry.id}>
                                 <td>{getAccountName(entry.accountId)}</td>
                                 <td style={{ textAlign: 'right' }}>{entry.debit > 0 ? entry.debit.toLocaleString('es-CL') : ''}</td>
