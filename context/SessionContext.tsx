@@ -50,12 +50,14 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 .single();
 
             if (profileError || !profileData) {
-                throw new Error('Perfil de usuario o empresa no encontrado.');
+                throw new Error('Perfil de usuario no encontrado.');
             }
 
             const user: User = { ...authUser, ...profileData };
+            const companyId = user.company_id;
 
-            if (user.role === 'System Administrator') {
+            // Si no hay company_id, es un admin o un usuario sin empresa asignada.
+            if (!companyId) {
                 setSession({
                     user,
                     company: null, periods: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
@@ -68,11 +70,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return;
             }
 
-            const companyId = user.company_id;
-            if (!companyId) {
-                throw new Error('El perfil del usuario no tiene una empresa asociada.');
-            }
-
+            // Si hay company_id, es un usuario de empresa. Cargar todos los datos.
             const [companyRes, periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes] = await Promise.all([
                 supabase.from('companies').select('*').eq('id', companyId).single(),
                 supabase.from('periods').select('*').eq('company_id', companyId),
@@ -164,6 +162,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 export const useSession = (): SessionContextValue => {
     const context = useContext(SessionContext);
-if (!context) throw new Error('useSession must be used within a SessionProvider');
+    if (!context) throw new Error('useSession must be used within a SessionProvider');
     return context;
 };
