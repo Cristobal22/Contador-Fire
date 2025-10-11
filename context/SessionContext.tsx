@@ -109,7 +109,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             if (session?.user) {
                 const { data: userProfile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('*, company:companies(*)')
+                    .select('*')
                     .eq('id', session.user.id)
                     .single();
                 
@@ -145,7 +145,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             } else if (event === 'SIGNED_IN' && session?.user) {
                  const { data: userProfile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('*, company:companies(*)')
+                    .select('*')
                     .eq('id', session.user.id)
                     .single();
                 if (userProfile) setCurrentUser(userProfile)
@@ -172,7 +172,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
         const { data: userProfile, error: profileError } = await supabase
             .from('profiles')
-            .select('*, company:companies(*)')
+            .select('*')
             .eq('id', data.user.id)
             .single();
 
