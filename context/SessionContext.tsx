@@ -64,7 +64,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
                     addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
                 });
-                setLoading(false); // Asegurarse de que loading sea false para admin/sin empresa
+                setLoading(false);
                 return;
             }
 
@@ -77,7 +77,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (companyError) throw companyError;
             if (!companyData) throw new Error(`Empresa con ID ${companyId} no encontrada.`);
             
-            // Carga de datos secundarios en paralelo con manejo de errores individual
             const dataSources = {
                 periods: supabase.from('periods').select('*').eq('company_id', companyId),
                 employees: supabase.from('employees').select('*').eq('company_id', companyId),
@@ -90,7 +89,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const { data, error } = await query;
                 if (error) {
                     handleApiError(error, `cargando ${key}`);
-                    return [key, []]; // Devuelve un array vacío en caso de error
+                    return [key, []];
                 }
                 return [key, data];
             }));
@@ -145,7 +144,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [handleApiError, addNotification]);
 
     useEffect(() => {
-        setLoading(true); // Empieza en loading en el primer render
+        setLoading(true);
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
             if (event === 'SIGNED_IN' && supabaseSession?.user) {
                 await loadAllData(supabaseSession.user);
