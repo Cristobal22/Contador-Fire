@@ -4,7 +4,7 @@ import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
 import Modal from '../components/Modal';
 import type { Payslip, PayslipData, Employee } from '../types';
-import { generatePayslipForEmployee } from '../utils/payroll'; // Importamos el motor de cálculo
+import { generatePayslipForEmployee } from '../utils/payrollEngine'; // CORREGIDO: Importamos desde el nuevo motor de cálculo
 
 // Componente para el formulario de edición (lo mantenemos por ahora para ajustes)
 const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void, onCancel: () => void, isLoading: boolean }> = ({ payslip, onSave, onCancel, isLoading }) => {
