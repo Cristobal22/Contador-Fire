@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
@@ -5,16 +6,19 @@ import { InvoiceForm } from '../components/Forms';
 import type { InvoiceData } from '../types';
 
 const InvoicesView: React.FC<{ type: 'Compra' | 'Venta' }> = ({ type }) => {
-    const { invoices, addInvoice, subjects, addNotification, handleApiError } = useSession();
+    const { session, addNotification, handleApiError } = useSession();
+    const { invoices, subjects, addInvoice } = session || {};
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     
     const handleSave = async (invoiceData: InvoiceData) => {
         setIsLoading(true);
         try {
-            await addInvoice(invoiceData);
-            addNotification({ type: 'success', message: `${type} y comprobante contable generados con éxito.`});
-            setIsModalOpen(false);
+            if (addInvoice) {
+                await addInvoice(invoiceData);
+                addNotification({ type: 'success', message: `${type} y comprobante contable generados con éxito.`});
+                setIsModalOpen(false);
+            }
         } catch (error: any) {
             handleApiError(error, `al agregar ${type.toLowerCase()}`);
         } finally {
@@ -22,8 +26,10 @@ const InvoicesView: React.FC<{ type: 'Compra' | 'Venta' }> = ({ type }) => {
         }
     };
     
-    const getSubjectName = (id: number) => subjects.find(s => s.id === id)?.name || 'N/A';
+    const getSubjectName = (id: number) => (subjects || []).find(s => s.id === id)?.name || 'N/A';
     const filteredInvoices = (invoices || []).filter(i => i.type === type);
+    
+    if (!session) return <div>Cargando...</div>;
 
     return (
         <div>
@@ -47,13 +53,13 @@ const InvoicesView: React.FC<{ type: 'Compra' | 'Venta' }> = ({ type }) => {
                             <td>{i.date}</td>
                             <td>{i.invoiceNumber}</td>
                             <td>{getSubjectName(i.subjectId)}</td>
-                            <td>{i.total}</td>
+                            <td>{i.total.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}</td>
                         </tr>
                     )) : <tr><td colSpan={4}>No hay registros.</td></tr>}
                 </tbody>
             </table>
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Agregar Nueva ${type}`}>
-                <InvoiceForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} type={type} isLoading={isLoading} />
+                <InvoiceForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} type={type} isLoading={isLoading} subjects={subjects || []} />
             </Modal>
         </div>
     );

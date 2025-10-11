@@ -1,12 +1,11 @@
 
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
-import type { ChartOfAccount, ChartOfAccountData } from '../types';
+import type { Account, AccountData } from '../types';
 import Modal from '../components/Modal';
 import Papa from 'papaparse';
-import { AccountForm } from '../components/AccountForm'; // Import the new form
+import { AccountForm } from '../components/AccountForm';
 
-// --- Reusable Styles ---
 const styles: { [key: string]: React.CSSProperties } = {
     container: { padding: '2rem' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' },
@@ -20,28 +19,27 @@ const styles: { [key: string]: React.CSSProperties } = {
     emptyStateText: { color: 'var(--text-light-color)', marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem auto' },
 };
 
-
-// --- Main Chart of Accounts View ---
 const ChartOfAccountsView = () => {
-    const { chartOfAccounts, addChartOfAccount, updateChartOfAccount, deleteChartOfAccount, handleApiError, addNotification } = useSession();
+    const { session, addNotification, handleApiError } = useSession();
+    const { accounts, addAccount, updateAccount, deleteAccount } = session || {};
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
     const handleAddNew = () => {
         setSelectedAccount(null);
         setIsModalOpen(true);
     };
 
-    const handleEdit = (account: ChartOfAccount) => {
+    const handleEdit = (account: Account) => {
         setSelectedAccount(account);
         setIsModalOpen(true);
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta cuenta?') && deleteAccount) {
             try {
-                await deleteChartOfAccount(id);
+                await deleteAccount(id);
                 addNotification({ type: 'success', message: 'Cuenta eliminada.' });
             } catch (error) {
                 handleApiError(error, 'al eliminar la cuenta');
@@ -49,14 +47,14 @@ const ChartOfAccountsView = () => {
         }
     };
 
-    const handleSave = async (data: ChartOfAccountData) => {
+    const handleSave = async (data: AccountData) => {
         setIsLoading(true);
         try {
-            if (selectedAccount) {
-                await updateChartOfAccount(selectedAccount.id, data);
+            if (selectedAccount && updateAccount) {
+                await updateAccount({ ...data, id: selectedAccount.id });
                 addNotification({ type: 'success', message: 'Cuenta actualizada.' });
-            } else {
-                await addChartOfAccount(data);
+            } else if (addAccount) {
+                await addAccount(data);
                 addNotification({ type: 'success', message: 'Cuenta creada.' });
             }
             setIsModalOpen(false);
@@ -67,9 +65,8 @@ const ChartOfAccountsView = () => {
         }
     };
 
-    // Special view for when the chart of accounts is empty
     const handleLoadDefault = () => {
-        if (!window.confirm('¿Cargar el plan de cuentas predeterminado? Esta acción no se puede deshacer.')) return;
+        if (!window.confirm('¿Cargar el plan de cuentas predeterminado? Esta acción no se puede deshacer.') || !addAccount) return;
         setIsLoading(true);
         fetch('/plan_de_cuentas_predeterminado.csv')
             .then(response => response.text())
@@ -78,11 +75,11 @@ const ChartOfAccountsView = () => {
                     header: true,
                     skipEmptyLines: true,
                     complete: async (results) => {
-                        const accountsToImport = results.data as ChartOfAccountData[];
+                        const accountsToImport = results.data as AccountData[];
                         try {
                             for (const acc of accountsToImport) {
                                 if (acc.code && acc.name && acc.type) {
-                                    await addChartOfAccount(acc);
+                                    await addAccount(acc);
                                 }
                             }
                             addNotification({ type: 'success', message: 'Plan de cuentas predeterminado cargado.' });
@@ -96,7 +93,9 @@ const ChartOfAccountsView = () => {
             .finally(() => setIsLoading(false));
     };
     
-    if (!chartOfAccounts || chartOfAccounts.length === 0) {
+    if (!session) return <div>Cargando...</div>
+
+    if (!accounts || accounts.length === 0) {
         return (
             <div style={{...styles.container, ...styles.emptyStateContainer}}>
                 <h2 style={styles.emptyStateTitle}>Tu Plan de Cuentas está vacío</h2>
@@ -124,7 +123,7 @@ const ChartOfAccountsView = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {chartOfAccounts.map(account => (
+                    {accounts.map(account => (
                         <tr key={account.id}>
                             <td style={styles.td}>{account.code}</td>
                             <td style={styles.td}>{account.name}</td>

@@ -16,7 +16,8 @@ const styles: { [key: string]: React.CSSProperties } = {
 };
 
 const CostCentersView = () => {
-    const { costCenters, addCostCenter, updateCostCenter, deleteCostCenter, handleApiError, addNotification } = useSession();
+    const { session, handleApiError, addNotification } = useSession();
+    const { costCenters, addCostCenter, updateCostCenter, deleteCostCenter } = session || {};
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [selected, setSelected] = useState<CostCenter | null>(null);
@@ -32,7 +33,7 @@ const CostCentersView = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este centro de costo?')) {
+        if (window.confirm('¿Estás seguro de que quieres eliminar este centro de costo?') && deleteCostCenter) {
             try {
                 await deleteCostCenter(id);
                 addNotification({ type: 'success', message: 'Centro de costo eliminado.' });
@@ -45,10 +46,10 @@ const CostCentersView = () => {
     const handleSave = async (data: CostCenterData) => {
         setIsLoading(true);
         try {
-            if (selected) {
-                await updateCostCenter(selected.id, data);
+            if (selected && updateCostCenter) {
+                await updateCostCenter({ ...data, id: selected.id });
                 addNotification({ type: 'success', message: 'Centro de costo actualizado.' });
-            } else {
+            } else if (addCostCenter) {
                 await addCostCenter(data);
                 addNotification({ type: 'success', message: 'Centro de costo creado.' });
             }
@@ -59,6 +60,8 @@ const CostCentersView = () => {
             setIsLoading(false);
         }
     };
+
+    if (!session) return <div>Cargando...</div>;
 
     return (
         <div style={styles.container}>
@@ -76,7 +79,7 @@ const CostCentersView = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {costCenters.length > 0 ? costCenters.map(cc => (
+                    {(costCenters && costCenters.length > 0) ? costCenters.map(cc => (
                         <tr key={cc.id}>
                             <td style={styles.td}>{cc.code}</td>
                             <td style={styles.td}>{cc.name}</td>

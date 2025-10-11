@@ -1,5 +1,7 @@
+
 import React, { useState, useMemo, ChangeEvent } from 'react';
 import { useSession } from '../context/SessionContext';
+import type { Account, Voucher } from '../types';
 
 const styles = {
     container: { display: 'flex', flexDirection: 'column', gap: '24px' },
@@ -26,7 +28,8 @@ type BankTx = { id: number; date: string; description: string; amount: number; }
 type LedgerTx = { id: number; date: string; description: string; amount: number; };
 
 const BankReconciliationView = () => {
-    const { chartOfAccounts, vouchers, addNotification } = useSession();
+    const { session, addNotification } = useSession();
+    const { accounts, vouchers } = session || {};
     const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
     const [bankTxs, setBankTxs] = useState<BankTx[]>([]);
     const [ledgerTxs, setLedgerTxs] = useState<LedgerTx[]>([]);
@@ -35,7 +38,7 @@ const BankReconciliationView = () => {
     const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(new Set());
     const [selectedLedgerIds, setSelectedLedgerIds] = useState<Set<number>>(new Set());
 
-    const bankAccounts = useMemo(() => (chartOfAccounts || []).filter(a => a.type === 'Activo' && a.name.toLowerCase().includes('banco')), [chartOfAccounts]);
+    const bankAccounts = useMemo(() => (accounts || []).filter(a => a.type === 'Activo' && a.name.toLowerCase().includes('banco')), [accounts]);
 
     const handleAccountChange = (e: ChangeEvent<HTMLSelectElement>) => {
         const accountId = Number(e.target.value);
@@ -93,7 +96,7 @@ const BankReconciliationView = () => {
     const { totalSelectedBank, totalSelectedLedger, canReconcile } = useMemo(() => {
         const totalBank = Array.from(selectedBankIds).reduce((sum: number, id) => sum + (bankTxs.find(tx => tx.id === id)?.amount || 0), 0);
         const totalLedger = Array.from(selectedLedgerIds).reduce((sum: number, id) => sum + (ledgerTxs.find(tx => tx.id === id)?.amount || 0), 0);
-        const can = totalBank !== 0 && totalLedger !== 0 && Math.abs(totalBank - totalLedger) < 0.01;
+        const can = totalBank !== 0 && totalLedger !== 0 && Math.abs(totalBank + totalLedger) < 0.01; // Logic correction
         return { totalSelectedBank: totalBank, totalSelectedLedger: totalLedger, canReconcile: can };
     }, [selectedBankIds, selectedLedgerIds, bankTxs, ledgerTxs]);
     
@@ -106,6 +109,8 @@ const BankReconciliationView = () => {
     };
     
     const formatCurrency = (val: number) => val.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' });
+
+    if (!session) return <div>Cargando...</div>;
 
     return (
         <div style={styles.container}>
@@ -178,9 +183,9 @@ const BankReconciliationView = () => {
                         <div style={styles.summaryLabel}>Total Seleccionado (Contabilidad)</div>
                         <div style={styles.summaryValue}>{formatCurrency(totalSelectedLedger)}</div>
                     </div>
-                    <div style={{...styles.summaryCard, borderLeftColor: canReconcile ? 'var(--success-color)' : 'var(--error-color)'}}>
+                    <div style={{...styles.summaryCard, borderLeft: canReconcile ? '4px solid var(--success-color)' : '4px solid var(--error-color)'}}>
                         <div style={styles.summaryLabel}>Diferencia</div>
-                        <div style={styles.summaryValue}>{formatCurrency(totalSelectedBank - totalSelectedLedger)}</div>
+                        <div style={styles.summaryValue}>{formatCurrency(totalSelectedBank + totalSelectedLedger)}</div>
                     </div>
                  </div>
             </div>

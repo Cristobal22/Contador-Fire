@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import type { Session, User, Company, Account, Voucher, Employee, Institution, MonthlyParameter, Payslip, Period, Notification } from '../types';
+import type { Session, User, Company, Account, Voucher, Employee, Institution, MonthlyParameter, Payslip, Period, Notification, CostCenter } from '../types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface SessionContextValue {
@@ -12,6 +12,7 @@ interface SessionContextValue {
     login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     sendPasswordResetEmail: (email: string) => Promise<void>;
+    handleApiError: (error: any, context: string) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -56,7 +57,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!companyId || user.role?.includes('Admin')) {
                 setSession({
                     user,
-                    company: null, periods: [], accounts: [], vouchers: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
+                    company: null, periods: [], accounts: [], vouchers: [], employees: [], institutions: [], monthlyParameters: [], payslips: [], costCenters: [],
                     activePeriod: '', setActivePeriod: () => {},
                     addAccount: async () => {}, updateAccount: async () => {}, deleteAccount: async () => {},
                     addVoucher: async () => {}, updateVoucher: async () => {}, deleteVoucher: async () => {},
@@ -64,6 +65,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     addInstitution: async () => {}, updateInstitution: async () => {}, deleteInstitution: async () => {},
                     addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
                     addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
+                    addCostCenter: async () => {}, updateCostCenter: async () => {}, deleteCostCenter: async () => {},
                 });
                 return;
             }
@@ -85,6 +87,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 institutions: supabase.from('institutions').select('*').eq('company_id', companyId),
                 monthlyParameters: supabase.from('monthly_parameters').select('*').eq('company_id', companyId),
                 payslips: supabase.from('payslips').select('*').eq('company_id', companyId),
+                cost_centers: supabase.from('cost_centers').select('*').eq('company_id', companyId),
             };
 
             const results = await Promise.all(Object.entries(dataSources).map(async ([key, query]) => {
@@ -114,6 +117,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 institutions: loadedData.institutions || [],
                 monthlyParameters: loadedData.monthlyParameters || [],
                 payslips: loadedData.payslips || [],
+                costCenters: loadedData.cost_centers || [],
                 activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
                 setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
                 addAccount: createCrud<Account>('accounts').add, updateAccount: createCrud<Account>('accounts').update, deleteAccount: createCrud<Account>('accounts').delete,
@@ -122,6 +126,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 addInstitution: createCrud<Institution>('institutions').add, updateInstitution: createCrud<Institution>('institutions').update, deleteInstitution: createCrud<Institution>('institutions').delete,
                 addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add, updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update, deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,
                 addPayslip: createCrud<Payslip>('payslips').add, updatePayslip: createCrud<Payslip>('payslips').update, deletePayslip: createCrud<Payslip>('payslips').delete,
+                addCostCenter: createCrud<CostCenter>('cost_centers').add, updateCostCenter: createCrud<CostCenter>('cost_centers').update, deleteCostCenter: createCrud<CostCenter>('cost_centers').delete,
             });
 
         } catch (error) {
@@ -174,7 +179,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
     }, [loadAllData, addNotification]);
 
-    const value: SessionContextValue = { session, loading, notifications, addNotification, login, logout, sendPasswordResetEmail };
+    const value: SessionContextValue = { session, loading, notifications, addNotification, login, logout, sendPasswordResetEmail, handleApiError };
 
     return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 };

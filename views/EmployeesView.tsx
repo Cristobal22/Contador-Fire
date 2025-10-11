@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import { EmployeeForm } from '../components/EmployeeForm';
@@ -6,7 +7,8 @@ import { formatRut } from '../utils/format';
 import type { Employee, EmployeeData } from '../types';
 
 const EmployeesView = () => {
-    const { employees, institutions, costCenters, addEmployee, updateEmployee, deleteEmployee, addNotification, handleApiError } = useSession();
+    const { session, addNotification, handleApiError } = useSession();
+    const { employees, institutions, costCenters, addEmployee, updateEmployee, deleteEmployee } = session || {};
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
@@ -21,7 +23,7 @@ const EmployeesView = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Está seguro de que desea eliminar este empleado?')) {
+        if (window.confirm('¿Está seguro de que desea eliminar este empleado?') && deleteEmployee) {
             try {
                 await deleteEmployee(id);
                 addNotification({ type: 'success', message: 'Empleado eliminado con éxito.' });
@@ -33,11 +35,11 @@ const EmployeesView = () => {
 
     const handleSave = async (employeeData: EmployeeData) => {
         try {
-            if (editingEmployee) {
+            if (editingEmployee && updateEmployee) {
                 const { id, ...data } = employeeData as Employee;
                 await updateEmployee({ ...data, id: editingEmployee.id });
                 addNotification({ type: 'success', message: 'Empleado actualizado con éxito.' });
-            } else {
+            } else if (addEmployee) {
                 await addEmployee(employeeData);
                 addNotification({ type: 'success', message: 'Empleado agregado con éxito.' });
             }
@@ -52,6 +54,8 @@ const EmployeesView = () => {
         setIsFormModalOpen(false);
         setEditingEmployee(null);
     }
+    
+    if (!session) return <div>Cargando...</div>; // O un spinner/skeleton
 
     return (
         <div>

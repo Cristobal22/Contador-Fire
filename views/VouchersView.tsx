@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import Modal from '../components/Modal';
 import { VoucherForm } from '../components/Forms';
-import type { Voucher, VoucherData, ChartOfAccount } from '../types';
+import type { Voucher, VoucherData, Account } from '../types';
 
-const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: ChartOfAccount[] }> = ({ voucher, onClose, accounts }) => {
+const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => void, accounts: Account[] }> = ({ voucher, onClose, accounts }) => {
     if (!voucher) return null;
     
     const getAccountName = (id: number | '') => (accounts || []).find(a => a.id === id)?.name || 'N/A';
@@ -53,7 +54,8 @@ const VoucherDetailModal: React.FC<{ voucher: Voucher | null, onClose: () => voi
 
 
 const VouchersView: React.FC = () => {
-    const { vouchers, chartOfAccounts, addVoucher, updateVoucher, deleteVoucher, addNotification, handleApiError } = useSession();
+    const { session, addNotification, handleApiError } = useSession();
+    const { vouchers, accounts, addVoucher, updateVoucher, deleteVoucher } = session || {};
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
@@ -70,7 +72,7 @@ const VouchersView: React.FC = () => {
     };
     
     const handleDelete = async (id: number) => {
-        if (window.confirm('¿Está seguro de que desea eliminar este comprobante? Esta acción no se puede deshacer.')) {
+        if (window.confirm('¿Está seguro de que desea eliminar este comprobante? Esta acción no se puede deshacer.') && deleteVoucher) {
             try {
                 await deleteVoucher(id);
                 addNotification({ type: 'success', message: 'Comprobante eliminado con éxito.' });
@@ -83,10 +85,10 @@ const VouchersView: React.FC = () => {
     const handleSave = async (voucherData: VoucherData) => {
         setIsLoading(true);
         try {
-            if (editingVoucher) {
+            if (editingVoucher && updateVoucher) {
                 await updateVoucher({ ...voucherData, id: editingVoucher.id });
                 addNotification({ type: 'success', message: 'Comprobante actualizado con éxito.' });
-            } else {
+            } else if (addVoucher) {
                 await addVoucher(voucherData);
                 addNotification({ type: 'success', message: 'Comprobante guardado con éxito.' });
             }
@@ -103,6 +105,8 @@ const VouchersView: React.FC = () => {
         setIsFormModalOpen(false);
         setEditingVoucher(null);
     }
+
+    if (!session) return <div>Cargando...</div>;
 
     return (
         <div>
@@ -132,10 +136,10 @@ const VouchersView: React.FC = () => {
             </table>
             
             <Modal isOpen={isFormModalOpen} onClose={handleCloseForm} title={editingVoucher ? 'Editar Comprobante' : 'Agregar Nuevo Comprobante'} size="lg">
-                <VoucherForm onSave={handleSave} onCancel={handleCloseForm} isLoading={isLoading} initialData={editingVoucher} accounts={chartOfAccounts} />
+                <VoucherForm onSave={handleSave} onCancel={handleCloseForm} isLoading={isLoading} initialData={editingVoucher} accounts={accounts || []} />
             </Modal>
             
-            <VoucherDetailModal voucher={viewingVoucher} onClose={() => setViewingVoucher(null)} accounts={chartOfAccounts} />
+            <VoucherDetailModal voucher={viewingVoucher} onClose={() => setViewingVoucher(null)} accounts={accounts || []} />
         </div>
     );
 };
