@@ -3,10 +3,9 @@ import React, { useState } from 'react';
 import { useSession } from '../context/SessionContext';
 import { SimpleReportView } from '../components/Views';
 import Modal from '../components/Modal';
-import type { Payslip, PayslipData, Employee } from '../types';
+import type { Payslip, Employee } from '../types';
 import { generatePayslipForEmployee } from '../utils/payrollEngine';
 
-// Componente para el formulario de edición
 const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void, onCancel: () => void, isLoading: boolean }> = ({ payslip, onSave, onCancel, isLoading }) => {
     const [advances, setAdvances] = useState(payslip.breakdown?.advances || 0);
 
@@ -31,29 +30,10 @@ const PayslipEditForm: React.FC<{ payslip: Payslip, onSave: (data: any) => void,
     );
 };
 
-
 const PayslipsView = () => {
-    const session = useSession();
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-
-    // -- SOLUCIÓN MEJORADA --
-    // Si la sesión o los datos esenciales (especialmente los que usan `.filter` o `.map`) 
-    // no están cargados, muestra un estado de carga robusto.
-    if (!session || !session.employees || !session.payslips || !session.institutions || !session.monthlyParameters || !session.activePeriod) {
-        return (
-            <SimpleReportView title="Gestión de Liquidaciones de Sueldo">
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                    <p>Cargando datos de liquidaciones...</p>
-                </div>
-            </SimpleReportView>
-        );
-    }
-
-    const { 
-        addNotification, 
-        handleApiError, 
+    const {
+        addNotification,
+        handleApiError,
         employees,
         institutions,
         payslips,
@@ -62,11 +42,12 @@ const PayslipsView = () => {
         deletePayslip,
         updatePayslip,
         activePeriod,
-        setActivePeriod 
-    } = session;
-
-    const currentYear = new Date(activePeriod + '-02').getFullYear();
-    const currentMonth = new Date(activePeriod + '-02').getMonth() + 1;
+        setActivePeriod
+    } = useSession();
+    
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handlePeriodChange = (year: number, month: number) => {
         const newPeriod = `${year}-${String(month).padStart(2, '0')}`;
@@ -87,21 +68,17 @@ const PayslipsView = () => {
         }
 
         let successCount = 0;
-        let errorCount = 0;
-
         for (const employee of employeesToProcess) {
             try {
                 const result = generatePayslipForEmployee(employee, institutions, activePeriod, monthlyParameters);
-                const payslipData: PayslipData = { /* ...datos... */ };
-                await addPayslip(payslipData);
+                await addPayslip(result.payslipData);
                 successCount++;
             } catch (error: any) {
-                errorCount++;
                 handleApiError(error, `al generar liquidación para ${employee.name}`);
             }
         }
 
-        addNotification({ type: 'success', message: `Proceso completado: ${successCount} liquidaciones generadas, ${errorCount} errores.` });
+        addNotification({ type: 'success', message: `Proceso completado: ${successCount} liquidaciones generadas.` });
         setIsLoading(false);
     };
 
@@ -139,15 +116,17 @@ const PayslipsView = () => {
 
     return (
         <SimpleReportView title="Gestión de Liquidaciones de Sueldo">
-            <div className="card-cta">
-                <div className="period-selector"> { /* ... */ } </div>
-                <button className={`btn btn-primary ${isLoading ? 'loading' : ''}`} onClick={handleGeneratePayslips} disabled={isLoading || !employees.length}>
-                    {/* ... */}
-                </button>
-            </div>
-
+             {/* ... UI elements like period selector and generate button ... */}
             <table>
-                <thead> { /* ... */ } </thead>
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Alcance Líquido</th>
+                        <th>Total Descuentos</th>
+                        <th>Sueldo Líquido</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
                 <tbody>
                     {filteredPayslips.length > 0 ? filteredPayslips.map(p => {
                         const employee = employees.find(e => e.id === p.employeeId);
@@ -159,12 +138,13 @@ const PayslipsView = () => {
                                 <td>{formatCurrency(totalDeductions)}</td>
                                 <td><strong>{formatCurrency(p.netPay)}</strong></td>
                                 <td className="table-actions">
-                                    {/* ... */}
+                                    <button className="btn-icon" onClick={() => handleEdit(p)}>edit</button>
+                                    <button className="btn-icon danger" onClick={() => handleDeleteConfirm(p.id)}>delete</button>
                                 </td>
                             </tr>
                         );
                     }) : (
-                        <tr><td colSpan={5}>No hay liquidaciones para el período seleccionado. Use el botón de arriba para generarlas.</td></tr>
+                        <tr><td colSpan={5}>No hay liquidaciones para el período seleccionado.</td></tr>
                     )}
                 </tbody>
             </table>
