@@ -2,17 +2,15 @@
 import React, { useEffect } from 'react';
 import { useForm } from '../hooks/useForm';
 
-// Define el tipo para un campo individual del formulario
 interface FormField {
     name: string;
     label: string;
     type: 'text' | 'number' | 'select' | 'date';
     options?: any[]; 
-    displayKey?: string; // Para selects con objetos
-    valueKey?: string; // Para selects con objetos
+    displayKey?: string;
+    valueKey?: string;
 }
 
-// Define las props del componente GenericForm
 interface GenericFormProps {
     onSave: (data: any) => void;
     onCancel: () => void;
@@ -22,15 +20,12 @@ interface GenericFormProps {
 }
 
 export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLoading, fields, initialData }) => {
-    const { register, handleSubmit, reset, watch, setValue } = useForm(initialData || {});
+    const { register, handleSubmit, reset } = useForm(initialData || {});
 
-    // Resetea el formulario si el item a editar cambia
     useEffect(() => {
         reset(initialData || {});
     }, [initialData, reset]);
 
-    // Esta es la función que se ejecutará en el submit.
-    // handleSubmit de react-hook-form se encarga de prevenir el default y pasar los datos.
     const handleFormSubmit = (data: any) => {
         if (onSave) {
             onSave(data);
@@ -38,8 +33,13 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
     };
 
     const renderField = (field: FormField) => {
+        // La corrección clave está aquí. Si el campo es numérico, lo registramos para que devuelva un número.
+        const registrationProps = field.type === 'number' 
+            ? register(field.name, { valueAsNumber: true }) 
+            : register(field.name);
+
         const commonProps = {
-            ...register(field.name),
+            ...registrationProps,
             id: field.name,
             className: 'form-control',
         };
@@ -49,7 +49,6 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
                 const options = field.options || [];
                 const displayKey = field.displayKey || 'label';
                 const valueKey = field.valueKey || 'value';
-
                 return (
                     <select {...commonProps}>
                         {options.map((option, index) => {
@@ -61,7 +60,7 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
                 );
 
             case 'number':
-                return <input type="number" {...commonProps} step="any" />; // step="any" para permitir decimales
+                return <input type="number" {...commonProps} step="any" />;
             
             case 'date':
                  return <input type="date" {...commonProps} />;
@@ -73,7 +72,6 @@ export const GenericForm: React.FC<GenericFormProps> = ({ onSave, onCancel, isLo
     };
 
     return (
-        // Aquí está la corrección clave: handleSubmit envuelve nuestra propia función.
         <form onSubmit={handleSubmit(handleFormSubmit)}>
             <div className="modal-body">
                 {fields.map(field => (
