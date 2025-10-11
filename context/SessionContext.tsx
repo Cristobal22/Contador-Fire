@@ -4,7 +4,6 @@ import { supabase } from '../supabaseClient';
 import type { Session, User, Company, Employee, Institution, MonthlyParameter, Payslip, Period, Notification } from '../types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
-// El valor del contexto puede ser nulo si no hay sesión, o un objeto de sesión.
 interface SessionContextValue {
     session: Session | null;
     loading: boolean;
@@ -32,12 +31,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.error(`Error ${context}:`, error);
         const message = (error instanceof Error) ? error.message : `Error desconocido al ${context}.`;
         addNotification({ type: 'error', message });
-        // No relanzar el error aquí para no interrumpir flujos que ya manejan errores.
     }, [addNotification]);
 
     const logout = useCallback(async () => {
         const { error } = await supabase.auth.signOut();
-        setSession(null); // Limpia la sesión localmente sin importar el resultado de Supabase
+        setSession(null);
         if (error) handleApiError(error, 'cerrar sesión');
     }, [handleApiError]);
 
@@ -46,7 +44,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
-                .select('*, company:companies(*)') // Carga el perfil y la empresa asociada
+                .select('*')
                 .eq('id', authUser.id)
                 .single();
 
@@ -54,9 +52,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!profileData) throw new Error('Perfil de usuario no encontrado.');
 
             const user: User = { ...authUser, ...profileData };
+            const companyId = user.company_id;
 
-            // Si no hay company_id o el rol es de administrador, es una sesión de Admin
-            if (!user.company_id || user.role?.includes('Admin')) {
+            if (!companyId || user.role?.includes('Admin')) {
                 setSession({
                     user,
                     company: null, periods: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
@@ -67,8 +65,15 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     addPayslip: async () => {}, updatePayslip: async () => {}, deletePayslip: async () => {},
                 });
             } else {
-                // Es un usuario de empresa, cargar todos los datos de la empresa
-                const companyId = user.company_id;
+                const { data: companyData, error: companyError } = await supabase
+                    .from('companies')
+                    .select('*')
+                    .eq('id', companyId)
+                    .single();
+
+                if (companyError) throw companyError;
+                if (!companyData) throw new Error(`Empresa con ID ${companyId} no encontrada.`);
+
                 const [periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes] = await Promise.all([
                     supabase.from('periods').select('*').eq('company_id', companyId),
                     supabase.from('employees').select('*').eq('company_id', companyId),
@@ -76,9 +81,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     supabase.from('monthly_parameters').select('*').eq('company_id', companyId),
                     supabase.from('payslips').select('*').eq('company_id', companyId),
                 ]);
-
-                const dataResponses = { periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes };
-                for (const [, res] of Object.entries(dataResponses)) {
+                
+                for (const res of [periodsRes, employeesRes, institutionsRes, monthlyParamsRes, payslipsRes]) {
                     if (res.error) throw res.error;
                 }
 
@@ -90,7 +94,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
                 setSession({
                     user,
-                    company: profileData.company as Company,
+                    company: companyData as Company,
                     periods: periodsRes.data || [],
                     employees: employeesRes.data || [],
                     institutions: institutionsRes.data || [],
