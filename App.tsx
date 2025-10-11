@@ -1,5 +1,5 @@
 
-import React, { ErrorInfo, ReactNode, useState } from 'react';
+import React, { ErrorInfo, ReactNode, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { SessionProvider, useSession } from './context/SessionContext';
 import { Sidebar } from './components/Navigation';
@@ -8,11 +8,10 @@ import { adminNavStructure } from './navigation.admin';
 import type { NavStructure } from './types';
 import { SearchModal } from './components/SearchModal';
 
-// Vistas...
+// Views...
 import LoginView from './views/LoginView';
 import UpdatePasswordView from './views/UpdatePasswordView';
 import DashboardView from './views/DashboardView';
-// ...el resto de las importaciones de vistas
 import CompaniesView from './views/CompaniesView';
 import { CompanySettingsView } from './views/Configuration/CompanySettingsView';
 import ChartOfAccountsView from './views/ChartOfAccountsView';
@@ -45,10 +44,6 @@ import FamilyAllowanceView from './views/FamilyAllowanceView';
 import SiiCentralizationView from './views/processes/SiiCentralizationView';
 import PreviredImportView from './views/processes/PreviredImportView';
 import AdminUsersView from './views/AdminUsersView';
-
-const styles = {
-    // ... (estilos existentes)
-};
 
 class ErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -84,23 +79,39 @@ const NotificationContainer = () => {
 };
 
 const Header = ({ onSearchClick }: { onSearchClick: () => void }) => {
-    const { session, logout } = useSession();
+    const { session, logout, switchCompany } = useSession();
 
-    if (!session) return null;
+    if (!session?.user) return null;
 
     const { user, company, periods, activePeriod, setActivePeriod } = session;
-    const isSystemAdmin = user.role?.includes('Admin');
+    const companies = user.companies || [];
+
+    useEffect(() => {
+        if (companies.length === 1 && !company) {
+            switchCompany(companies[0].id);
+        }
+    }, [companies, company, switchCompany]);
+
+    const handleCompanyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const companyId = parseInt(e.target.value, 10);
+        if (companyId) {
+            switchCompany(companyId);
+        }
+    };
 
     return (
         <header className="app-header">
             <div className="header-selectors">
-                {company && (
+                {companies.length > 0 && (
                     <div className="selector-wrapper">
                         <span className="material-symbols-outlined">business</span>
-                        <span style={{marginLeft: '8px', fontWeight: 500}}>{company.name}</span>
+                        <select value={company?.id || ''} onChange={handleCompanyChange} className="selector">
+                            <option value="">Seleccione una empresa...</option>
+                            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
                     </div>
                 )}
-                {periods && periods.length > 0 && (
+                {company && periods && periods.length > 0 && (
                      <div className="selector-wrapper">
                         <span className="material-symbols-outlined">calendar_month</span>
                         <select value={activePeriod} onChange={(e) => setActivePeriod(e.target.value)} className="selector">
@@ -108,7 +119,7 @@ const Header = ({ onSearchClick }: { onSearchClick: () => void }) => {
                         </select>
                     </div>
                 )}
-                 {isSystemAdmin && <span style={{marginLeft: '16px', fontWeight: 500, color: 'var(--text-light-color)'}}>Modo Administrador</span>}
+                 {user.role?.includes('Admin') && <span style={{marginLeft: '16px', fontWeight: 500, color: 'var(--text-light-color)'}}>Modo Administrador</span>}
             </div>
             <div className="user-profile">
                  <button className="btn-icon" title="Buscar" onClick={onSearchClick} style={{marginRight: '8px'}}>
@@ -123,7 +134,7 @@ const Header = ({ onSearchClick }: { onSearchClick: () => void }) => {
     );
 };
 
-const getPathBreadcrumb = (pathname: string, navData: NavStructure): string => { /* ... (sin cambios) */ return ''; };
+const getPathBreadcrumb = (pathname: string, navData: NavStructure): string => { return ''; };
 
 const AppLayout = () => {
     const { session } = useSession();
@@ -174,7 +185,6 @@ const AuthWrapper = () => {
                  <Route index element={<Navigate to={session?.user?.role?.includes('Admin') ? '/admin/users' : '/dashboard'} replace />} />
                 <Route path="dashboard" element={<DashboardView />} />
                 
-                {/* Rutas de la aplicación principal */}
                 <Route path="contabilidad/movimientos/comprobantes" element={<VouchersView />} />
                 <Route path="contabilidad/movimientos/compras" element={<InvoicesView type="Compra" />} />
                 <Route path="contabilidad/movimientos/ventas" element={<InvoicesView type="Venta" />} />
@@ -182,9 +192,7 @@ const AuthWrapper = () => {
                 <Route path="remuneraciones/movimientos/ficha-de-personal" element={<EmployeesView />} />
                 <Route path="remuneraciones/movimientos/liquidaciones" element={<PayslipsView />} />
                 <Route path="configuracion/general/parametros-mensuales" element={<MonthlyParametersView />} />
-                {/* ... más rutas ... */}
                 
-                {/* Rutas de Admin */}
                 <Route path="admin/users" element={<AdminUsersView />} />
                 
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
