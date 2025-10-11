@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import type { Session, User, Company, Employee, Institution, MonthlyParameter, Payslip, Period, Notification } from '../types';
+import type { Session, User, Company, Account, Voucher, Employee, Institution, MonthlyParameter, Payslip, Period, Notification } from '../types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface SessionContextValue {
@@ -56,8 +56,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!companyId || user.role?.includes('Admin')) {
                 setSession({
                     user,
-                    company: null, periods: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
+                    company: null, periods: [], accounts: [], vouchers: [], employees: [], institutions: [], monthlyParameters: [], payslips: [],
                     activePeriod: '', setActivePeriod: () => {},
+                    addAccount: async () => {}, updateAccount: async () => {}, deleteAccount: async () => {},
+                    addVoucher: async () => {}, updateVoucher: async () => {}, deleteVoucher: async () => {},
                     addEmployee: async () => {}, updateEmployee: async () => {}, deleteEmployee: async () => {},
                     addInstitution: async () => {}, updateInstitution: async () => {}, deleteInstitution: async () => {},
                     addMonthlyParameter: async () => {}, updateMonthlyParameter: async () => {}, deleteMonthlyParameter: async () => {},
@@ -77,6 +79,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             
             const dataSources = {
                 periods: supabase.from('periods').select('*').eq('company_id', companyId),
+                accounts: supabase.from('accounts').select('*').eq('company_id', companyId),
+                vouchers: supabase.from('vouchers').select('*').eq('company_id', companyId),
                 employees: supabase.from('employees').select('*').eq('company_id', companyId),
                 institutions: supabase.from('institutions').select('*').eq('company_id', companyId),
                 monthlyParameters: supabase.from('monthly_parameters').select('*').eq('company_id', companyId),
@@ -104,12 +108,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 user,
                 company: companyData as Company,
                 periods: loadedData.periods || [],
+                accounts: loadedData.accounts || [],
+                vouchers: loadedData.vouchers || [],
                 employees: loadedData.employees || [],
                 institutions: loadedData.institutions || [],
                 monthlyParameters: loadedData.monthlyParameters || [],
                 payslips: loadedData.payslips || [],
                 activePeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
                 setActivePeriod: (period) => setSession(prev => prev ? { ...prev, activePeriod: period } : null),
+                addAccount: createCrud<Account>('accounts').add, updateAccount: createCrud<Account>('accounts').update, deleteAccount: createCrud<Account>('accounts').delete,
+                addVoucher: createCrud<Voucher>('vouchers').add, updateVoucher: createCrud<Voucher>('vouchers').update, deleteVoucher: createCrud<Voucher>('vouchers').delete,
                 addEmployee: createCrud<Employee>('employees').add, updateEmployee: createCrud<Employee>('employees').update, deleteEmployee: createCrud<Employee>('employees').delete,
                 addInstitution: createCrud<Institution>('institutions').add, updateInstitution: createCrud<Institution>('institutions').update, deleteInstitution: createCrud<Institution>('institutions').delete,
                 addMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').add, updateMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').update, deleteMonthlyParameter: createCrud<MonthlyParameter>('monthly_parameters').delete,

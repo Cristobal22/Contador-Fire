@@ -40,27 +40,28 @@ const styles = {
 const COLORS = ['#1a73e8', '#1e8e3e', '#d93025', '#f9ab00', '#8f00ff', '#ff6d00'];
 
 const DashboardView = () => {
-    const { vouchers, accounts, activePeriod, periods } = useSession();
+    const { session } = useSession();
+    const { vouchers, accounts, activePeriod, periods } = session || {};
 
-    const activePeriodLabel = (periods && periods.length > 0) ? periods.find(p => p.value === activePeriod)?.label || activePeriod : activePeriod;
+    const activePeriodLabel = useMemo(() => {
+        if (!periods || periods.length === 0) return activePeriod;
+        return periods.find(p => p.value === activePeriod)?.label || activePeriod;
+    }, [periods, activePeriod]);
 
     const expenseData = useMemo(() => {
-        // 1. Filter for expense accounts (type 'Resultado').
-        const expenseAccounts = (accounts || []).filter(a => a.type === 'Resultado');
+        if (!vouchers || !accounts || !activePeriod) return [];
+
+        const expenseAccounts = accounts.filter(a => a.type === 'Resultado');
         const expenseAccountIds = new Set(expenseAccounts.map(a => a.id));
+        const periodVouchers = vouchers.filter(v => v.date.startsWith(activePeriod));
 
-        // 2. Filter vouchers for the active period.
-        const periodVouchers = (vouchers || []).filter(v => v.date.startsWith(activePeriod));
-
-        // 3. Aggregate expenses.
         const totals = new Map<string, number>();
         for (const voucher of periodVouchers) {
             for (const entry of voucher.entries) {
-                if (entry.accountId !== '' && expenseAccountIds.has(entry.accountId)) {
+                if (entry.accountId && expenseAccountIds.has(entry.accountId)) {
                     const account = accounts.find(a => a.id === entry.accountId);
                     if (account) {
                         const currentTotal = totals.get(account.name) || 0;
-                        // For 'Resultado' accounts, debits are expenses/losses, credits are income/gains.
                         const netAmount = entry.debit - entry.credit;
                         totals.set(account.name, currentTotal + netAmount);
                     }
@@ -68,7 +69,6 @@ const DashboardView = () => {
             }
         }
 
-        // 4. Format for recharts, showing only positive totals (expenses) and filtering out income accounts.
         return Array.from(totals.entries())
             .filter(([, total]) => total > 0)
             .map(([name, Gasto]) => ({ name, Gasto }))
@@ -78,6 +78,14 @@ const DashboardView = () => {
 
     const formatCurrency = (value: number) => `$${new Intl.NumberFormat('es-CL').format(value)}`;
     const formatLabel = (value: string) => value.length > 20 ? `${value.substring(0, 20)}...` : value;
+
+    if (!session) {
+        return (
+            <div style={styles.noDataPlaceholder}>
+                <p>Cargando datos del dashboard...</p>
+            </div>
+        );
+    }
 
     return (
         <div style={styles.dashboardContainer}>
@@ -91,12 +99,12 @@ const DashboardView = () => {
                     <ResponsiveContainer width="100%" height={400}>
                         <BarChart
                             data={expenseData}
-                            margin={{ top: 5, right: 30, left: 20, bottom: 80 }} // Increased bottom margin for angled labels
-                            layout="horizontal"
+                            margin={{ top: 5, right: 30, left: 20, bottom: 80 }}
+                            layout="vertical"
                         >
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" tickFormatter={formatLabel} angle={-45} textAnchor="end" interval={0} height={100} />
-                            <YAxis tickFormatter={(value) => new Intl.NumberFormat('es-CL', { notation: 'compact', compactDisplay: 'short' }).format(value)} />
+                            <XAxis type="number" tickFormatter={value => new Intl.NumberFormat('es-CL', { notation: 'compact', compactDisplay: 'short' }).format(value)} />
+                            <YAxis dataKey="name" type="category" tickFormatter={formatLabel} width={150} />
                             <Tooltip formatter={(value: number) => formatCurrency(value)} />
                             <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }}/>
                             <Bar dataKey="Gasto" name="Total Gastado">
